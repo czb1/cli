@@ -8,7 +8,7 @@
 - **AI 可探索**：`--help`（分层）+ `describe`（完整语义契约）。
 - **零业务逻辑**：CLI 仅作 HTTP 客户端，调用 `https://omtool.rnd.huawei.com`。
 
-覆盖接口文档中全部 **38** 个接口。
+覆盖接口文档中全部 **50** 个接口。
 
 ## 构建
 
@@ -60,12 +60,12 @@ Windows 上安装后需**重开终端**，`setx` 对已打开的窗口不生效�
 ./omres-cli raw /api/some/newEndpoint -X POST --body '{}'
 ```
 
-### 命令分组（39 接口）
+### 命令分组（50 接口）
 
 | group | actions |
 |-------|---------|
 | auth | login, status, logout |
-| task | create, export-struct, export-result, download, delete-one ⚠ |
+| task | create, export-struct, export-result, download, export-validate, include-alarm, delete-one ⚠ |
 | upload | file, parse-xml |
 | moc | add-name, select-name, insert-info, generate-script |
 | moc-field | add-name, select-name, update-info |
@@ -82,9 +82,41 @@ Windows 上安装后需**重开终端**，`setx` 对已打开的窗口不生效�
 | info-module | query-all |
 | overallview | search |
 | resource | auto-gen-id |
+| alarm-service | upsert, list |
+| alarm | upsert, list |
+| alarm-enum | upsert, list |
+| alarm-enum-value | upsert |
+| alarm-para | upsert, list |
 
 标 ⚠ 的是破坏性命令，详见下方「破坏性操作」。
 此外还有一个不属于任何 group 的 `raw` 命令，用于直调尚未收录的接口。
+
+### 告警建模：调用顺序
+
+CLI 只提供原子命令，**不做编排**——下面每一步的入参需要调用方自己从上一步的响应里取。
+
+| # | 命令 | 依赖上一步的 |
+|---|------|------------|
+| 1 | `alarm-service upsert` | — |
+| 2 | `alarm-service list` | 按 `serviceName` 找到 `id` → 后续 `serviceId` |
+| 3 | `alarm upsert` | `serviceId` |
+| 4 | `alarm list` | `serviceId`；取响应的 `id` 与 `alarmId` |
+| 5 | `alarm upsert` | 回传 `id`/`serviceId`/`alarmId` + 级别、分类等完整配置 |
+| 6 | `alarm-enum upsert` | `alarmInternalId` = 第 4 步的 `id` |
+| 7 | `alarm-enum list` | 取响应的 `id` → 枚举值的 `enumTypeId` |
+| 8 | `alarm-enum-value upsert` | `enumTypeId` |
+| 9 | `alarm-para upsert` | `alarmInternalId` = 第 4 步的 `id` |
+| 10 | `alarm-para list` | 取响应的 `id` 与 `paramOrder` |
+| 11 | `alarm-para upsert` | 回传 `id`/`alarmInternalId`/`paramOrder` + 完整字段 |
+| 12 | `validate do` | `projectId` = taskId |
+| 13 | `task export-validate` | — |
+| 14 | `task include-alarm` | multipart 表单，用 `--taskId` 而不是 `--body` |
+| 15 | `task export-result <taskId> <taskName>` | — |
+| 16 | `task download <taskId> <taskName>` | 二进制，自动存临时文件 |
+
+> ⚠ **易错点**：`alarm-enum list` / `alarm-para list` 的入参名叫 `alarmId`，
+> 但要传的是告警的**内部主键 `id`**（第 4 步响应里的 `id`，如 `96`），
+> 不是后端分配的告警号字符串（如 `"100910"`）。`alarmInternalId` 同理。
 
 ## 破坏性操作
 

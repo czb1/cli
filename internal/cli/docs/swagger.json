@@ -2411,7 +2411,7 @@
       }
     },
     "/sbbapi/task/getExportStructResult/{taskId}/{taskName}": {
-      "post": {
+      "get": {
         "summary": "获取导出Go Struct的异步任务结果",
         "tags": [
           "Task"
@@ -2498,6 +2498,93 @@
         },
         "produces": [
           "application/octet-stream"
+        ]
+      }
+    },
+    "/sbbapi/task/exportValidate/": {
+      "post": {
+        "summary": "导出前校验（路径末尾的斜杠是后端要求，不能去掉）",
+        "tags": [
+          "Task"
+        ],
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "taskId": {
+                  "type": "integer",
+                  "description": "工程/任务ID"
+                }
+              },
+              "required": [
+                "taskId"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "boolean",
+                  "description": "业务是否成功"
+                },
+                "show": {
+                  "type": "boolean",
+                  "description": "校验结果是否需要展示"
+                },
+                "message": {
+                  "type": "string",
+                  "description": "提示信息"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/task/isTaskIncludeAlarm": {
+      "post": {
+        "summary": "判断工程是否含有告警（multipart 表单，不是 JSON）",
+        "tags": [
+          "Task"
+        ],
+        "parameters": [
+          {
+            "name": "taskId",
+            "in": "formData",
+            "required": true,
+            "type": "string",
+            "description": "工程/任务ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "boolean",
+                  "description": "业务是否成功"
+                },
+                "message": {
+                  "type": "string",
+                  "description": "提示信息，如 \"工程含有告警\""
+                }
+              }
+            }
+          }
+        },
+        "consumes": [
+          "multipart/form-data"
         ]
       }
     },
@@ -3084,6 +3171,1027 @@
                 "message": {
                   "type": "string",
                   "description": "提示信息，成功时为null"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/alarmService/insertOrUpdate": {
+      "post": {
+        "summary": "新增或修改告警服务",
+        "tags": [
+          "Alarm"
+        ],
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "taskId": {
+                  "type": "integer",
+                  "description": "工程/任务ID"
+                },
+                "alarmServiceTable": {
+                  "type": "object",
+                  "description": "告警服务信息",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "告警服务内部主键ID。新增传空字符串 \"\"，修改传 alarm-service list 返回的 id"
+                    },
+                    "serviceName": {
+                      "type": "string",
+                      "description": "告警服务名称"
+                    },
+                    "microServiceType": {
+                      "type": "string",
+                      "description": "微服务类型，如 udgService / basicBizService"
+                    },
+                    "microServiceName": {
+                      "type": "string",
+                      "description": "微服务名称，如 udgompublic / ompublic"
+                    }
+                  },
+                  "required": [
+                    "serviceName"
+                  ]
+                }
+              },
+              "required": [
+                "taskId",
+                "alarmServiceTable"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "boolean",
+                  "description": "业务是否成功，false 时 CLI 会以 JSON-RPC error 返回"
+                },
+                "message": {
+                  "type": "string",
+                  "description": "提示信息"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/alarmService/list": {
+      "post": {
+        "summary": "查询告警服务列表",
+        "tags": [
+          "Alarm"
+        ],
+        "description": "新建告警服务后用本接口按 serviceName 反查其 id，该 id 即后续告警接口的 serviceId。",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "taskId": {
+                  "type": "integer",
+                  "description": "工程/任务ID"
+                }
+              },
+              "required": [
+                "taskId"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "boolean",
+                  "description": "业务是否成功，false 时 CLI 会以 JSON-RPC error 返回"
+                },
+                "message": {
+                  "type": "string",
+                  "description": "提示信息"
+                },
+                "data": {
+                  "type": "array",
+                  "description": "告警服务列表",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer",
+                        "description": "告警服务内部主键ID，即后续的 serviceId"
+                      },
+                      "serviceName": {
+                        "type": "string",
+                        "description": "告警服务名称"
+                      },
+                      "microServiceType": {
+                        "type": "string",
+                        "description": "微服务类型，如 udgService / basicBizService"
+                      },
+                      "microServiceName": {
+                        "type": "string",
+                        "description": "微服务名称，如 udgompublic / ompublic"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/alarm/insertOrUpdate": {
+      "post": {
+        "summary": "新增或修改告警（含告警配置信息）",
+        "tags": [
+          "Alarm"
+        ],
+        "description": "同一接口覆盖两种用法：新建时只传 serviceId + 中英文名（id 传空字符串），后端分配 alarmId；补全配置时传回 list 拿到的 id、serviceId、alarmId 再带上级别/分类等字段。",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "taskId": {
+                  "type": "integer",
+                  "description": "工程/任务ID"
+                },
+                "alarmTable": {
+                  "type": "object",
+                  "description": "告警信息，新建时未知字段可省略或传 null",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "告警内部主键ID。新增传空字符串 \"\"，修改传 alarm list 返回的 id"
+                    },
+                    "serviceId": {
+                      "type": "integer",
+                      "description": "所属告警服务ID，取自 alarm-service list 返回的 id"
+                    },
+                    "alarmId": {
+                      "type": "string",
+                      "description": "告警号，由后端分配（如 \"100910\"），注意与内部主键 id 不是一回事"
+                    },
+                    "mocName": {
+                      "type": "string",
+                      "description": "MOC名称"
+                    },
+                    "alarmEnglishName": {
+                      "type": "string",
+                      "description": "告警英文名"
+                    },
+                    "alarmChineseName": {
+                      "type": "string",
+                      "description": "告警中文名"
+                    },
+                    "alarmTypeId": {
+                      "type": "integer",
+                      "description": "告警类型ID"
+                    },
+                    "alarmLevelId": {
+                      "type": "integer",
+                      "description": "告警级别ID"
+                    },
+                    "eventTypeId": {
+                      "type": "integer",
+                      "description": "事件类型ID"
+                    },
+                    "isCheck": {
+                      "type": "integer",
+                      "description": "是否核查"
+                    },
+                    "isGlobal": {
+                      "type": "integer",
+                      "description": "是否全局告警"
+                    },
+                    "isAutoClean": {
+                      "type": "integer",
+                      "description": "是否自动清除"
+                    },
+                    "transientPeriod": {
+                      "type": "integer",
+                      "description": "瞬断周期（秒），默认90"
+                    },
+                    "toggleStartPeriod": {
+                      "type": "integer",
+                      "description": "频繁告警统计起始周期（秒），默认300"
+                    },
+                    "toggleEndPeriod": {
+                      "type": "integer",
+                      "description": "频繁告警统计结束周期（秒），默认300"
+                    },
+                    "toggleThreshold": {
+                      "type": "integer",
+                      "description": "频繁告警阈值，默认3"
+                    },
+                    "alarmName": {
+                      "type": "string",
+                      "description": "告警名称标识"
+                    },
+                    "northObjType": {
+                      "type": "string",
+                      "description": "北向对象类型"
+                    },
+                    "alarmCreReasonCh": {
+                      "type": "string",
+                      "description": "告警产生原因（中文）"
+                    },
+                    "alarmCreReasonEn": {
+                      "type": "string",
+                      "description": "告警产生原因（英文）"
+                    },
+                    "isSuppress": {
+                      "type": "integer",
+                      "description": "是否抑制"
+                    },
+                    "largeParticlesType": {
+                      "type": "integer",
+                      "description": "大颗粒类型"
+                    },
+                    "nlsType": {
+                      "type": "string",
+                      "description": "NLS类型"
+                    },
+                    "assist": {
+                      "type": "string",
+                      "description": "辅助信息"
+                    },
+                    "ossAlarmLevel": {
+                      "type": "string",
+                      "description": "OSS告警级别，如 \"三级告警\""
+                    },
+                    "alarmExplain": {
+                      "type": "string",
+                      "description": "告警解释"
+                    },
+                    "applyNe": {
+                      "type": "string",
+                      "description": "适用网元"
+                    },
+                    "mobileLogicClassify": {
+                      "type": "string",
+                      "description": "移动-逻辑分类，如 \"硬件告警\""
+                    },
+                    "mobileLogicClassifyChild": {
+                      "type": "string",
+                      "description": "移动-逻辑子分类，如 \"CPU硬件告警\""
+                    },
+                    "mobileAffectToDevice": {
+                      "type": "string",
+                      "description": "移动-对设备的影响"
+                    },
+                    "mobileAffectToBusiness": {
+                      "type": "string",
+                      "description": "移动-对业务的影响"
+                    },
+                    "mobileIsRelatedPeer": {
+                      "type": "string",
+                      "description": "移动-是否关联对端，\"是\"/\"否\""
+                    },
+                    "unicomLogicClassify": {
+                      "type": "string",
+                      "description": "联通-逻辑分类"
+                    },
+                    "unicomLogicClassifyChild": {
+                      "type": "string",
+                      "description": "联通-逻辑子分类"
+                    },
+                    "unicomAffectToDevice": {
+                      "type": "string",
+                      "description": "联通-对设备的影响"
+                    },
+                    "unicomAffectToBusiness": {
+                      "type": "string",
+                      "description": "联通-对业务的影响"
+                    }
+                  },
+                  "required": [
+                    "serviceId",
+                    "alarmChineseName",
+                    "alarmEnglishName"
+                  ]
+                }
+              },
+              "required": [
+                "taskId",
+                "alarmTable"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "boolean",
+                  "description": "业务是否成功，false 时 CLI 会以 JSON-RPC error 返回"
+                },
+                "message": {
+                  "type": "string",
+                  "description": "提示信息"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/alarm/list": {
+      "post": {
+        "summary": "查询指定告警服务下的告警列表",
+        "tags": [
+          "Alarm"
+        ],
+        "description": "响应里的 id 是告警内部主键（后续 alarmInternalId 用它），alarmId 是后端分配的告警号字符串，两者不要混用。",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "taskId": {
+                  "type": "integer",
+                  "description": "工程/任务ID"
+                },
+                "serviceId": {
+                  "type": "integer",
+                  "description": "告警服务ID，取自 alarm-service list 返回的 id"
+                }
+              },
+              "required": [
+                "taskId",
+                "serviceId"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "boolean",
+                  "description": "业务是否成功，false 时 CLI 会以 JSON-RPC error 返回"
+                },
+                "message": {
+                  "type": "string",
+                  "description": "提示信息"
+                },
+                "data": {
+                  "type": "array",
+                  "description": "告警列表",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer",
+                        "description": "告警内部主键ID，即后续的 alarmInternalId"
+                      },
+                      "serviceId": {
+                        "type": "integer",
+                        "description": "所属告警服务ID，取自 alarm-service list 返回的 id"
+                      },
+                      "alarmId": {
+                        "type": "string",
+                        "description": "告警号，由后端分配（如 \"100910\"），注意与内部主键 id 不是一回事"
+                      },
+                      "mocName": {
+                        "type": "string",
+                        "description": "MOC名称"
+                      },
+                      "alarmEnglishName": {
+                        "type": "string",
+                        "description": "告警英文名"
+                      },
+                      "alarmChineseName": {
+                        "type": "string",
+                        "description": "告警中文名"
+                      },
+                      "alarmTypeId": {
+                        "type": "integer",
+                        "description": "告警类型ID"
+                      },
+                      "alarmLevelId": {
+                        "type": "integer",
+                        "description": "告警级别ID"
+                      },
+                      "eventTypeId": {
+                        "type": "integer",
+                        "description": "事件类型ID"
+                      },
+                      "isCheck": {
+                        "type": "integer",
+                        "description": "是否核查"
+                      },
+                      "isGlobal": {
+                        "type": "integer",
+                        "description": "是否全局告警"
+                      },
+                      "isAutoClean": {
+                        "type": "integer",
+                        "description": "是否自动清除"
+                      },
+                      "transientPeriod": {
+                        "type": "integer",
+                        "description": "瞬断周期（秒），默认90"
+                      },
+                      "toggleStartPeriod": {
+                        "type": "integer",
+                        "description": "频繁告警统计起始周期（秒），默认300"
+                      },
+                      "toggleEndPeriod": {
+                        "type": "integer",
+                        "description": "频繁告警统计结束周期（秒），默认300"
+                      },
+                      "toggleThreshold": {
+                        "type": "integer",
+                        "description": "频繁告警阈值，默认3"
+                      },
+                      "alarmName": {
+                        "type": "string",
+                        "description": "告警名称标识"
+                      },
+                      "northObjType": {
+                        "type": "string",
+                        "description": "北向对象类型"
+                      },
+                      "alarmCreReasonCh": {
+                        "type": "string",
+                        "description": "告警产生原因（中文）"
+                      },
+                      "alarmCreReasonEn": {
+                        "type": "string",
+                        "description": "告警产生原因（英文）"
+                      },
+                      "isSuppress": {
+                        "type": "integer",
+                        "description": "是否抑制"
+                      },
+                      "largeParticlesType": {
+                        "type": "integer",
+                        "description": "大颗粒类型"
+                      },
+                      "nlsType": {
+                        "type": "string",
+                        "description": "NLS类型"
+                      },
+                      "assist": {
+                        "type": "string",
+                        "description": "辅助信息"
+                      },
+                      "ossAlarmLevel": {
+                        "type": "string",
+                        "description": "OSS告警级别，如 \"三级告警\""
+                      },
+                      "alarmExplain": {
+                        "type": "string",
+                        "description": "告警解释"
+                      },
+                      "applyNe": {
+                        "type": "string",
+                        "description": "适用网元"
+                      },
+                      "mobileLogicClassify": {
+                        "type": "string",
+                        "description": "移动-逻辑分类，如 \"硬件告警\""
+                      },
+                      "mobileLogicClassifyChild": {
+                        "type": "string",
+                        "description": "移动-逻辑子分类，如 \"CPU硬件告警\""
+                      },
+                      "mobileAffectToDevice": {
+                        "type": "string",
+                        "description": "移动-对设备的影响"
+                      },
+                      "mobileAffectToBusiness": {
+                        "type": "string",
+                        "description": "移动-对业务的影响"
+                      },
+                      "mobileIsRelatedPeer": {
+                        "type": "string",
+                        "description": "移动-是否关联对端，\"是\"/\"否\""
+                      },
+                      "unicomLogicClassify": {
+                        "type": "string",
+                        "description": "联通-逻辑分类"
+                      },
+                      "unicomLogicClassifyChild": {
+                        "type": "string",
+                        "description": "联通-逻辑子分类"
+                      },
+                      "unicomAffectToDevice": {
+                        "type": "string",
+                        "description": "联通-对设备的影响"
+                      },
+                      "unicomAffectToBusiness": {
+                        "type": "string",
+                        "description": "联通-对业务的影响"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/alarmEnum/insertOrUpdate": {
+      "post": {
+        "summary": "新增或修改告警枚举类型",
+        "tags": [
+          "Alarm"
+        ],
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "taskId": {
+                  "type": "integer",
+                  "description": "工程/任务ID"
+                },
+                "alarmEnumTable": {
+                  "type": "object",
+                  "description": "告警枚举类型信息",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "枚举类型内部主键ID。新增传空字符串 \"\"，修改传 alarm-enum list 返回的 id"
+                    },
+                    "alarmInternalId": {
+                      "type": "integer",
+                      "description": "所属告警的内部主键ID（alarm list 返回的 id，不是告警号 alarmId）"
+                    },
+                    "enumType": {
+                      "type": "string",
+                      "description": "枚举类型"
+                    },
+                    "enumName": {
+                      "type": "string",
+                      "description": "枚举类型名称"
+                    }
+                  },
+                  "required": [
+                    "alarmInternalId",
+                    "enumType",
+                    "enumName"
+                  ]
+                }
+              },
+              "required": [
+                "taskId",
+                "alarmEnumTable"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "boolean",
+                  "description": "业务是否成功，false 时 CLI 会以 JSON-RPC error 返回"
+                },
+                "message": {
+                  "type": "string",
+                  "description": "提示信息"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/alarmEnum/list": {
+      "post": {
+        "summary": "查询告警枚举类型列表",
+        "tags": [
+          "Alarm"
+        ],
+        "description": "注意入参名虽叫 alarmId，实际要传告警的内部主键 id（alarm list 返回的 id），不是告警号字符串。",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "taskId": {
+                  "type": "integer",
+                  "description": "工程/任务ID"
+                },
+                "alarmId": {
+                  "type": "integer",
+                  "description": "告警内部主键ID（alarm list 返回的 id，不是告警号 alarmId）"
+                }
+              },
+              "required": [
+                "taskId",
+                "alarmId"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "boolean",
+                  "description": "业务是否成功，false 时 CLI 会以 JSON-RPC error 返回"
+                },
+                "message": {
+                  "type": "string",
+                  "description": "提示信息"
+                },
+                "data": {
+                  "type": "array",
+                  "description": "枚举类型列表",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer",
+                        "description": "枚举类型ID，即创建枚举值时的 enumTypeId"
+                      },
+                      "alarmInternalId": {
+                        "type": "integer",
+                        "description": "所属告警的内部主键ID（alarm list 返回的 id，不是告警号 alarmId）"
+                      },
+                      "enumType": {
+                        "type": "string",
+                        "description": "枚举类型"
+                      },
+                      "enumName": {
+                        "type": "string",
+                        "description": "枚举类型名称"
+                      },
+                      "alarmEnumList": {
+                        "type": "array",
+                        "items": {
+                          "type": "object"
+                        },
+                        "description": "该枚举类型下的枚举值列表，list 接口通常返回 null"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/alarmEnumValue/insertOrUpdate": {
+      "post": {
+        "summary": "新增或修改告警枚举值",
+        "tags": [
+          "Alarm"
+        ],
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "taskId": {
+                  "type": "integer",
+                  "description": "工程/任务ID"
+                },
+                "alarmEnumValueTable": {
+                  "type": "object",
+                  "description": "告警枚举值信息",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "枚举值内部主键ID。新增传空字符串 \"\" 或省略"
+                    },
+                    "enumTypeId": {
+                      "type": "integer",
+                      "description": "所属枚举类型ID，取自 alarm-enum list 返回的 id"
+                    },
+                    "iValue": {
+                      "type": "string",
+                      "description": "枚举整型值"
+                    },
+                    "englishSvalue": {
+                      "type": "string",
+                      "description": "枚举英文名"
+                    },
+                    "chineseSvalue": {
+                      "type": "string",
+                      "description": "枚举中文名"
+                    },
+                    "itemMeanEn": {
+                      "type": "string",
+                      "description": "枚举含义（英文），无内容填 NA"
+                    },
+                    "itemMeanCh": {
+                      "type": "string",
+                      "description": "枚举含义（中文）"
+                    }
+                  },
+                  "required": [
+                    "enumTypeId",
+                    "iValue"
+                  ]
+                }
+              },
+              "required": [
+                "taskId",
+                "alarmEnumValueTable"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "boolean",
+                  "description": "业务是否成功，false 时 CLI 会以 JSON-RPC error 返回"
+                },
+                "message": {
+                  "type": "string",
+                  "description": "提示信息"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/alarmPara/insertOrUpdate": {
+      "post": {
+        "summary": "新增或修改告警参数",
+        "tags": [
+          "Alarm"
+        ],
+        "description": "分两步用：先只传 alarmInternalId + paramEnglishAbbreviationName 建参数占位（可带 isAllowEdit=1），再用 alarm-para list 拿到 id 与 paramOrder 后回传完整字段补全。",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "taskId": {
+                  "type": "integer",
+                  "description": "工程/任务ID"
+                },
+                "isAllowEdit": {
+                  "type": "integer",
+                  "description": "是否允许编辑，与 alarmParaTable 平级，新增参数时传 1"
+                },
+                "alarmParaTable": {
+                  "type": "object",
+                  "description": "告警参数信息",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "告警参数内部主键ID。新增传空字符串 \"\" 或省略，补全时传 alarm-para list 返回的 id"
+                    },
+                    "alarmInternalId": {
+                      "type": "integer",
+                      "description": "所属告警的内部主键ID（alarm list 返回的 id，不是告警号 alarmId）"
+                    },
+                    "paramEnglishAbbreviationName": {
+                      "type": "string",
+                      "description": "参数英文缩写名，新增时只需传这一个字段"
+                    },
+                    "paramEnglishName": {
+                      "type": "string",
+                      "description": "参数英文名"
+                    },
+                    "paramChineseName": {
+                      "type": "string",
+                      "description": "参数中文名"
+                    },
+                    "paramLength": {
+                      "type": "string",
+                      "description": "参数长度"
+                    },
+                    "paramClassId": {
+                      "type": "integer",
+                      "description": "参数类别ID"
+                    },
+                    "paramTypeId": {
+                      "type": "integer",
+                      "description": "参数类型ID"
+                    },
+                    "enumTypeId": {
+                      "type": "integer",
+                      "description": "关联的枚举类型ID，取自 alarm-enum list 返回的 id"
+                    },
+                    "alarmId": {
+                      "type": "integer",
+                      "description": "关联告警ID"
+                    },
+                    "paramMeanCh": {
+                      "type": "string",
+                      "description": "参数含义（中文）"
+                    },
+                    "paramMeanEn": {
+                      "type": "string",
+                      "description": "参数含义（英文）"
+                    },
+                    "isAllowEdit": {
+                      "type": "integer",
+                      "description": "是否允许编辑"
+                    },
+                    "paramOrder": {
+                      "type": "integer",
+                      "description": "参数顺序，取自 alarm-para list 返回的 paramOrder"
+                    }
+                  },
+                  "required": [
+                    "alarmInternalId",
+                    "paramEnglishAbbreviationName"
+                  ]
+                }
+              },
+              "required": [
+                "taskId",
+                "alarmParaTable"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "boolean",
+                  "description": "业务是否成功，false 时 CLI 会以 JSON-RPC error 返回"
+                },
+                "message": {
+                  "type": "string",
+                  "description": "提示信息"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/alarmPara/list": {
+      "post": {
+        "summary": "查询告警参数列表",
+        "tags": [
+          "Alarm"
+        ],
+        "description": "注意入参名虽叫 alarmId，实际要传告警的内部主键 id（alarm list 返回的 id），不是告警号字符串。",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "taskId": {
+                  "type": "integer",
+                  "description": "工程/任务ID"
+                },
+                "alarmId": {
+                  "type": "integer",
+                  "description": "告警内部主键ID（alarm list 返回的 id，不是告警号 alarmId）"
+                }
+              },
+              "required": [
+                "taskId",
+                "alarmId"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "boolean",
+                  "description": "业务是否成功，false 时 CLI 会以 JSON-RPC error 返回"
+                },
+                "message": {
+                  "type": "string",
+                  "description": "提示信息"
+                },
+                "data": {
+                  "type": "array",
+                  "description": "告警参数列表",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer",
+                        "description": "告警参数内部主键ID"
+                      },
+                      "alarmInternalId": {
+                        "type": "integer",
+                        "description": "所属告警的内部主键ID（alarm list 返回的 id，不是告警号 alarmId）"
+                      },
+                      "paramEnglishAbbreviationName": {
+                        "type": "string",
+                        "description": "参数英文缩写名，新增时只需传这一个字段"
+                      },
+                      "paramEnglishName": {
+                        "type": "string",
+                        "description": "参数英文名"
+                      },
+                      "paramChineseName": {
+                        "type": "string",
+                        "description": "参数中文名"
+                      },
+                      "paramLength": {
+                        "type": "integer",
+                        "description": "参数长度"
+                      },
+                      "paramClassId": {
+                        "type": "integer",
+                        "description": "参数类别ID"
+                      },
+                      "paramTypeId": {
+                        "type": "integer",
+                        "description": "参数类型ID"
+                      },
+                      "enumTypeId": {
+                        "type": "integer",
+                        "description": "关联的枚举类型ID，取自 alarm-enum list 返回的 id"
+                      },
+                      "alarmId": {
+                        "type": "integer",
+                        "description": "关联告警ID"
+                      },
+                      "paramMeanCh": {
+                        "type": "string",
+                        "description": "参数含义（中文）"
+                      },
+                      "paramMeanEn": {
+                        "type": "string",
+                        "description": "参数含义（英文）"
+                      },
+                      "isAllowEdit": {
+                        "type": "integer",
+                        "description": "是否允许编辑"
+                      },
+                      "paramOrder": {
+                        "type": "integer",
+                        "description": "参数顺序，取自 alarm-para list 返回的 paramOrder"
+                      }
+                    }
+                  }
                 }
               }
             }

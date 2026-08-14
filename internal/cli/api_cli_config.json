@@ -56,12 +56,12 @@
         {
           "http": {
             "path": "/sbbapi/task/getExportStructResult/{taskId}/{taskName}",
-            "method": "POST"
+            "method": "GET"
           },
           "cli": {
             "action": "export-result",
-            "description": "获取导出Go Struct的异步任务结果",
-            "example": "omres-cli task export-result 123 demo"
+            "description": "获取导出Go Struct/告警中间件的异步任务结果（告警导出第1步）",
+            "example": "omres-cli task export-result 2947 UDG_20_X_Master"
           }
         },
         {
@@ -71,8 +71,30 @@
           },
           "cli": {
             "action": "download",
-            "description": "下载导出的Go Struct结果文件（二进制，自动保存到临时文件）",
-            "example": "omres-cli task download 123 demo"
+            "description": "下载导出结果文件（二进制，自动保存到临时文件。告警导出第2步）",
+            "example": "omres-cli task download 2947 UDG_20_X_Master"
+          }
+        },
+        {
+          "http": {
+            "path": "/sbbapi/task/exportValidate/",
+            "method": "POST"
+          },
+          "cli": {
+            "action": "export-validate",
+            "description": "导出前校验（路径末尾斜杠为后端要求）",
+            "example": "omres-cli task export-validate --body '{\"taskId\":2947}'"
+          }
+        },
+        {
+          "http": {
+            "path": "/api/task/isTaskIncludeAlarm",
+            "method": "POST"
+          },
+          "cli": {
+            "action": "include-alarm",
+            "description": "判断工程是否含有告警（multipart 表单，参数用 --taskId 而非 --body）",
+            "example": "omres-cli task include-alarm --taskId 2947"
           }
         },
         {
@@ -521,6 +543,130 @@
             "action": "auto-gen-id",
             "description": "自动生成性能指标ID（支持metric和mu两种类型）",
             "example": "omres-cli resource auto-gen-id --neName UNC --belongService 203 --idType metric --taskId 47754 --muId 9"
+          }
+        }
+      ]
+    },
+    "alarm-service": {
+      "description": "告警服务",
+      "resources": [
+        {
+          "http": {
+            "path": "/api/alarmService/insertOrUpdate",
+            "method": "POST"
+          },
+          "cli": {
+            "action": "upsert",
+            "description": "新增或修改告警服务（新增时 id 传空字符串）",
+            "example": "omres-cli alarm-service upsert --body '{\"taskId\":2947,\"alarmServiceTable\":{\"id\":\"\",\"serviceName\":\"test\",\"microServiceType\":\"udgService\",\"microServiceName\":\"udgompublic\"}}'"
+          }
+        },
+        {
+          "http": {
+            "path": "/api/alarmService/list",
+            "method": "POST"
+          },
+          "cli": {
+            "action": "list",
+            "description": "查询告警服务列表，按 serviceName 反查其 id（即后续的 serviceId）",
+            "example": "omres-cli alarm-service list --body '{\"taskId\":2947}'"
+          }
+        }
+      ]
+    },
+    "alarm": {
+      "description": "告警",
+      "resources": [
+        {
+          "http": {
+            "path": "/api/alarm/insertOrUpdate",
+            "method": "POST"
+          },
+          "cli": {
+            "action": "upsert",
+            "description": "新增或修改告警。新建只需 serviceId+中英文名（id 传空字符串）；补全配置时回传 list 拿到的 id/serviceId/alarmId 及级别、分类等字段",
+            "example": "omres-cli alarm upsert --body '{\"taskId\":2947,\"alarmTable\":{\"id\":\"\",\"serviceId\":92,\"alarmChineseName\":\"alarmtest_cn\",\"alarmEnglishName\":\"alarmtest_en\"}}'"
+          }
+        },
+        {
+          "http": {
+            "path": "/api/alarm/list",
+            "method": "POST"
+          },
+          "cli": {
+            "action": "list",
+            "description": "查询指定告警服务下的告警列表。返回的 id 是内部主键（后续 alarmInternalId 用它），alarmId 是后端分配的告警号字符串",
+            "example": "omres-cli alarm list --body '{\"taskId\":2947,\"serviceId\":92}'"
+          }
+        }
+      ]
+    },
+    "alarm-enum": {
+      "description": "告警枚举类型",
+      "resources": [
+        {
+          "http": {
+            "path": "/api/alarmEnum/insertOrUpdate",
+            "method": "POST"
+          },
+          "cli": {
+            "action": "upsert",
+            "description": "新增或修改告警枚举类型（alarmInternalId 为告警内部主键 id）",
+            "example": "omres-cli alarm-enum upsert --body '{\"taskId\":2947,\"alarmEnumTable\":{\"id\":\"\",\"alarmInternalId\":96,\"enumType\":\"2\",\"enumName\":\"ENUMTEST\"}}'"
+          }
+        },
+        {
+          "http": {
+            "path": "/api/alarmEnum/list",
+            "method": "POST"
+          },
+          "cli": {
+            "action": "list",
+            "description": "查询告警枚举类型列表。入参名虽叫 alarmId，实际传告警内部主键 id；返回的 id 即枚举值的 enumTypeId",
+            "example": "omres-cli alarm-enum list --body '{\"taskId\":2947,\"alarmId\":96}'"
+          }
+        }
+      ]
+    },
+    "alarm-enum-value": {
+      "description": "告警枚举值",
+      "resources": [
+        {
+          "http": {
+            "path": "/api/alarmEnumValue/insertOrUpdate",
+            "method": "POST"
+          },
+          "cli": {
+            "action": "upsert",
+            "description": "新增或修改告警枚举值（enumTypeId 取自 alarm-enum list 返回的 id）",
+            "example": "omres-cli alarm-enum-value upsert --body '{\"taskId\":2947,\"alarmEnumValueTable\":{\"enumTypeId\":56,\"iValue\":\"0\",\"englishSvalue\":\"engname\",\"chineseSvalue\":\"中文枚举名\",\"itemMeanEn\":\"NA\",\"itemMeanCh\":\"中文含义\"}}'"
+          }
+        }
+      ]
+    },
+    "alarm-para": {
+      "description": "告警参数",
+      "resources": [
+        {
+          "http": {
+            "path": "/api/alarmPara/insertOrUpdate",
+            "method": "POST"
+          },
+          "cli": {
+            "action": "upsert",
+            "description": "新增或修改告警参数。先只传 alarmInternalId+paramEnglishAbbreviationName 建占位，再用 list 拿到 id 与 paramOrder 后回传完整字段补全",
+            "example": "omres-cli alarm-para upsert --body '{\"taskId\":2947,\"isAllowEdit\":1,\"alarmParaTable\":{\"alarmInternalId\":96,\"paramEnglishAbbreviationName\":\"PODNAME\"}}'"
+          }
+        },
+        {
+          "http": {
+            "path": "/api/alarmPara/list",
+            "method": "POST"
+          },
+          "cli": {
+            "action": "list",
+            "description": "查询告警参数列表。入参名虽叫 alarmId，实际传告警内部主键 id",
+            "example": "omres-cli alarm-para list --body '{\"taskId\":2947,\"alarmId\":96}'"
           }
         }
       ]
