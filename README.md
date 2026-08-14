@@ -6,19 +6,32 @@
 - **Swagger 为真相源**：`internal/cli/docs/swagger.json` 提供参数、类型、输出 schema。启动时校验配置的 `path+method` 都存在于 swagger。
 - **统一输出**：所有命令输出 JSON-RPC 2.0，后端 JSON 保持原生对象，不做二次字符串化。
 - **AI 可探索**：`--help`（分层）+ `describe`（完整语义契约）。
-- **零业务逻辑**：CLI 仅作 HTTP 客户端，调用 `http://10.243.80.228`。
+- **零业务逻辑**：CLI 仅作 HTTP 客户端，调用 `https://omtool.rnd.huawei.com`。
 
-覆盖接口文档中全部 **36** 个接口。
+覆盖接口文档中全部 **38** 个接口。
 
 ## 构建
 
-本环境无 Go 工具链且无网络，需在你本机构建（Go 1.21+）：
+需要 Go 1.21+。**零第三方依赖**，只用标准库，因此内网无法访问公共 Go 代理时也能直接构建
+（`go.mod` 中没有任何 require，`go mod tidy` 不会发起网络请求）。
 
 ```bash
-cd omres-cli
-go mod tidy          # 拉取 cobra/pflag 依赖并生成 go.sum
-go build -o omres-cli ./cmd/cli
+go build -o omres-cli ./cmd/cli            # Linux / macOS
+GOOS=windows go build -o omres-cli.exe ./cmd/cli   # 交叉编译 Windows
 ```
+
+也可以用现成脚本，会一并完成冒烟检查与安装到 PATH：
+
+```powershell
+.\build.ps1                # Windows
+```
+
+```bash
+./build.sh                 # Linux / macOS
+```
+
+两者都支持 `-NoInstall` / `--no-install`（只构建不安装）。
+Windows 上安装后需**重开终端**，`setx` 对已打开的窗口不生效。
 
 `swagger.json` 与 `api_cli_config.json` 通过 `//go:embed` 编译进二进制，运行时不依赖外部文件。
 
@@ -42,20 +55,23 @@ go build -o omres-cli ./cmd/cli
 
 # 从文件读 body
 ./omres-cli mml-command upsert --body-file ./cmd.json
+
+# 直调尚未收录的接口（自动带会话，输出同样是 JSON-RPC）
+./omres-cli raw /api/some/newEndpoint -X POST --body '{}'
 ```
 
-### 命令分组（36 接口）
+### 命令分组（39 接口）
 
 | group | actions |
 |-------|---------|
-| auth | login |
-| task | create, export-struct, export-result, download |
+| auth | login, status, logout |
+| task | create, export-struct, export-result, download, delete-one ⚠ |
 | upload | file, parse-xml |
 | moc | add-name, select-name, insert-info, generate-script |
 | moc-field | add-name, select-name, update-info |
 | datatype | add, query-all, enum-add, enum-query-all |
 | default-record | add |
-| method | add-name, update-name, delete-name, select-info |
+| method | add-name, update-name, delete-name ⚠, select-info |
 | mml-command | upsert, get |
 | command-para | upsert, list |
 | mml-para | list |
@@ -64,17 +80,114 @@ go build -o omres-cli ./cmd/cli
 | errorcode | shield |
 | info-code | add, list |
 | info-module | query-all |
+| overallview | search |
+| resource | auto-gen-id |
+
+标 ⚠ 的是破坏性命令，详见下方「破坏性操作」。
+此外还有一个不属于任何 group 的 `raw` 命令，用于直调尚未收录的接口。
+
+## 破坏性操作
+
+删除类命令（路径含 `delete`/`remove`/`drop`/`clear`/`purge` 等，或方法为 `DELETE`）
+默认**不会**直接执行，需要显式确认：
+
+```bash
+# 预览将要发送的请求，不实际发送
+omres-cli task delete-one --body '{"taskId":48050}' --dry-run
+
+# 确认无误后执行
+omres-cli task delete-one --body '{"taskId":48050}' --yes
+```
+
+| 场景 | 行为 |
+|------|------|
+| 交互式终端 | 提示 `确认继续？输入 yes 回车` |
+| 脚本 / AI Agent（stdin 非终端） | **直接拒绝**，返回 `-32004 Confirmation Required` |
+| 加了 `--yes` | 直接执行 |
+| 加了 `--dry-run` | 只打印请求预览 |
+
+非交互环境刻意设计为「拒绝」而非「等待输入」——否则调用方会卡在等待上直到超时。
+
+### 业务失败识别
+
+本后端存在 **HTTP 200 但业务失败**的接口，例如 `/api/task/deleteOne`
+删除失败时返回 `200 + {"status":false}`。若只看 HTTP 状态码，删除失败会被当成成功。
+
+因此 HTTP 2xx 响应还会按接口契约二次判定：
+
+| 响应形态 | 判定 |
+|----------|------|
+| `status` 为布尔 `false` | 失败 → `Operation Failed` |
+| `code` 存在且非 0 | 失败 → `Business Error` |
+| 其它 | 成功 |
+
+## raw：直调未收录接口
+
+当某接口还没写进 `api_cli_config.json` / `docs/swagger.json` 时，用 `raw` 访问：
+
+```bash
+omres-cli raw /api/task/list -X POST --body '{}'
+omres-cli raw /api/task/deleteOne -X POST --body '{"taskId":123}' --yes
+omres-cli raw /some/path --query page=1 --query size=20 -H 'X-Trace: abc'
+```
+
+支持 `-X/--method`、`--body`、`--body-file`、`--query k=v`、`-H/--header`、
+`--yes`、`--dry-run`。破坏性判定与上一节一致。
+
+> **不要**为了调用未收录接口去读 `~/.omres-cli/session.json` 里的 Cookie 拼 curl。
+> 那样会绕开会话管理、统一错误码与破坏性确认。`raw` 就是为这个场景准备的。
 
 ## 鉴权
 
-登录接口 (`auth login`) 使用域账号，后端通常以 **Session Cookie** 维持会话。拿到 Cookie 后，用以下任一方式给后续命令携带：
+登录、查看状态、登出都由 `auth` 组承担，登录态自动落盘，**后续命令无需再传 `--cookie`**。
 
 ```bash
-# 环境变量（推荐，CI/CD 安全注入，优先级高于配置文件）
-export OMRES_AUTH_COOKIE='JSESSIONID=xxxx'
-# 或运行时
-./omres-cli validate do --body '{"projectId":123}' --cookie 'JSESSIONID=xxxx'
+# 1) 登录（推荐：密码走标准输入，不进命令历史）
+omres-cli auth login --username zhangsan --password-stdin < pass.txt
+# 交互式（密码不回显）
+omres-cli auth login --username zhangsan
+# CI/CD
+$env:OMRES_AUTH_USERNAME="zhangsan"; $env:OMRES_AUTH_PASSWORD="******"
+omres-cli auth login
+
+# 2) 查看状态（本地检查，不发网络请求）
+omres-cli auth status
+# 额外向后端发一次只读探活，确认会话真的没失效
+omres-cli auth status --online
+
+# 3) 登出
+omres-cli auth logout
 ```
+
+登录成功后 Cookie 写入 `~/.omres-cli/session.json`（Windows 为 `%USERPROFILE%\.omres-cli\session.json`），
+文件权限 `0600`。**密码不会出现在任何输出或文件中**，输出里的 Cookie 一律打码（`JSESSIONID=ABC******XYZ`）。
+
+### auth status 的退出码
+
+`auth status` 是唯一带语义退出码的命令，便于脚本 / AI Agent 直接分支判断：
+
+| 退出码 | 含义 | 建议动作 |
+|--------|------|----------|
+| 0 | 已认证 | 继续后续流程 |
+| 3 | 未认证或会话已过期 | 引导用户执行 `omres-cli auth login` |
+| 1 | 其它错误（如 `--online` 时后端不可达） | 排查网络 / `--server`，**不要**误判为需要重新登录 |
+
+其余命令仍保持「永远退出 0，结果看 JSON-RPC」的既有约定，不影响已有脚本。
+
+### 会话有效期
+
+- 后端 Cookie 带 `Expires` / `Max-Age` → 以后端为准。
+- 只下发会话 Cookie（无过期时间）→ 本地按软 TTL **8 小时**判定，可用 `OMRES_SESSION_TTL_HOURS` 覆盖。
+
+### 凭证来源优先级
+
+请求携带的 Cookie 按此顺序解析，先命中先用：
+
+```
+--cookie  >  OMRES_AUTH_COOKIE  >  api_cli_config.json  >  ~/.omres-cli/session.json
+```
+
+`auth status` 输出的 `source` 字段会告诉你当前用的是哪一个。
 
 其它鉴权方式（若后端改用 Token/API Key/Basic）在 `defaults.auth` 中声明 `type` 即可，对应覆盖环境变量：
 
@@ -86,19 +199,9 @@ export OMRES_AUTH_COOKIE='JSESSIONID=xxxx'
 | defaults.auth.username | `OMRES_AUTH_USERNAME` |
 | defaults.auth.password | `OMRES_AUTH_PASSWORD` |
 | defaults.auth.cookie | `OMRES_AUTH_COOKIE` |
+| defaults.auth.probe_path / probe_body | 仅配置文件（`auth status --online` 用的只读探活接口） |
 
 凭证不会出现在正常输出中；请勿把明文凭证提交到仓库。
-
-## 两个需要你确认的设计决定
-
-1. **路径前缀**：接口文档里前端路径带 `/api`、`/sbbapi`、`/list`、`/longtime` 前缀，Vue 代理会剥掉前缀再转发给后端。基础 URL `http://10.243.80.228` 若是**代理/前端入口**，就用带前缀的完整路径（当前默认）。若你要让 CLI **直连后端**（前缀已被剥掉），重新生成 swagger：
-   ```bash
-   STRIP_PREFIX=1 python3 tools/build_swagger.py
-   go build -o omres-cli ./cmd/cli
-   ```
-   并把 `api_cli_config.json` 里的 path 同步改成去前缀版本。
-
-2. **接口 33 `info-code list`**：文档注明后端实际方法路径是 `/infoCode/queryAll`，而前端调用的是 `/list/infoCode/list`。当前按前端路径（经代理）配置。若直连后端，改为 `/infoCode/queryAll`。
 
 ## 输出示例
 
@@ -113,6 +216,19 @@ export OMRES_AUTH_COOKIE='JSESSIONID=xxxx'
   "data": { "code": 10001, "msg": "名称已存在" } }, "id": "req-..." }
 ```
 
+业务失败（HTTP 200 但 `status:false`）：
+```json
+{ "jsonrpc": "2.0", "error": { "code": -32000, "message": "Operation Failed",
+  "data": { "status": false } }, "id": "req-..." }
+```
+
+破坏性操作未确认：
+```json
+{ "jsonrpc": "2.0", "error": { "code": -32004, "message": "Confirmation Required",
+  "data": { "method": "POST", "path": "/api/task/deleteOne",
+  "hint": "这是破坏性操作。确认无误后请加 --yes 重新执行。" } }, "id": "req-..." }
+```
+
 二进制下载：
 ```json
 { "jsonrpc": "2.0", "result": { "file": "/tmp/download-...", "content_type": "application/octet-stream", "size": 20480 }, "id": "req-..." }
@@ -125,10 +241,15 @@ omres-cli/
 ├── cmd/cli/main.go                    # 入口
 ├── internal/cli/
 │   ├── cli.go                         # 加载配置+swagger，校验，构建命令树
-│   ├── builder.go                     # 由配置+swagger 生成 Cobra 命令
+│   ├── command.go                     # 命令树与 flag 解析（标准库实现，替代 cobra）
+│   ├── builder.go                     # 由配置+swagger 生成命令
 │   ├── config.go                      # 配置解析、env 覆盖、校验
 │   ├── swagger.go                     # Swagger 解析与操作索引
 │   ├── describe.go                    # describe 命令 + 辅助函数
+│   ├── auth.go                        # auth login / status / logout
+│   ├── raw.go                         # raw 直调命令 + 破坏性操作确认
+│   ├── session.go                     # 会话落盘、过期判定、Cookie 打码
+│   ├── prompt.go / prompt_*.go        # 交互式输入（密码不回显，零外部依赖）
 │   ├── httpclient.go                  # HTTP 客户端、鉴权注入、响应封装
 │   ├── jsonrpc.go                     # JSON-RPC 2.0 输出
 │   ├── types.go                       # 数据模型
