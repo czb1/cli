@@ -8,7 +8,7 @@
 - **AI 可探索**：`--help`（分层）+ `describe`（完整语义契约）。
 - **零业务逻辑**：CLI 仅作 HTTP 客户端，调用 `https://omtool.rnd.huawei.com`。
 
-覆盖接口文档中全部 **38** 个接口。
+覆盖接口文档中全部 **43** 个接口。
 
 ## 构建
 
@@ -60,7 +60,7 @@ Windows 上安装后需**重开终端**，`setx` 对已打开的窗口不生效�
 ./omres-cli raw /api/some/newEndpoint -X POST --body '{}'
 ```
 
-### 命令分组（39 接口）
+### 命令分组（44 接口）
 
 | group | actions |
 |-------|---------|
@@ -80,11 +80,57 @@ Windows 上安装后需**重开终端**，`setx` 对已打开的窗口不生效�
 | errorcode | shield |
 | info-code | add, list |
 | info-module | query-all |
-| overallview | search |
-| resource | auto-gen-id |
+| overallview | search, micro-service-list |
+| resource | auto-gen-id, north-auto-gen-id |
+| perf | indicator-group-add, indicator-add, indicator-update |
 
 标 ⚠ 的是破坏性命令，详见下方「破坏性操作」。
 此外还有一个不属于任何 group 的 `raw` 命令，用于直调尚未收录的接口。
+
+### 性能指标注册流程（perf / resource / overallview）
+
+新增一个指标组（测量单元）和其下的指标，接口有严格先后顺序：前一步拿到的 ID 是后一步的入参。
+以「指定RATTYPE的CGW发送 PDU Session Establishment Reject消息数」为例：
+
+```bash
+# 0) 按实际服务列表（如 SmcExecSvc）查出 belongService 服务ID
+omres-cli overallview micro-service-list
+
+# 1) 取测量单元ID（muId）
+omres-cli resource auto-gen-id --neName UNC --belongService 203 --idType mu --taskId 47754
+# → {"status":true,"data":55}
+
+# 2) 取网管测量单元ID（nmMuId）；注意 belongService 用网管侧服务ID
+omres-cli resource north-auto-gen-id --neName UNC --belongService 114 --idType mu --checkDeleted false
+# → {"status":true,"data":1929445469}
+
+# 3) 注册指标组（测量单元）
+omres-cli perf indicator-group-add --taskId 47754 --body-file ./mu.json
+
+# 4) 在该指标组下取指标ID（muId 必填）
+omres-cli resource auto-gen-id --neName UNC --belongService 203 --idType metric --taskId 47754 --muId 55
+# → {"status":true,"data":103856}
+
+# 5) 登记指标ID与名称
+omres-cli perf indicator-add --taskId 47754 --belongService 203 \
+  --body '{"metricId":"103856","metricName":"指定RATTYPE的CGW发送 PDU Session Establishment Reject消息数","meType":0,"belongService":203,"muId":55}'
+
+# 6) 取网管指标ID（nmMetricId）
+omres-cli resource north-auto-gen-id --neName UNC --belongService 114 --idType metric --checkDeleted false
+# → {"status":true,"data":1929446634}
+
+# 7) 补齐指标完整属性（算法、值类型、语言资源、测量点、nmMetricId 等）
+omres-cli perf indicator-update --taskId 47754 --metricId 103856 --belongService 203 --body-file ./metric.json
+```
+
+几点约定：
+
+- `resource auto-gen-id` 与 `resource north-auto-gen-id` 是两套 ID 空间：前者是本地（`belongService` 如 203），
+  后者是网管北向（`belongService` 如 114），不要混用。
+- `indicator-update` 的查询参数 `--metricId` 必须与请求体里的 `metricId` 一致。
+- 这几个接口都以 `{"status":false}` 表达业务失败，CLI 会把它转成 `Operation Failed` 错误，不会当成成功。
+- 请求体字段较多，建议用 `--body-file`；未在 swagger 中列出的后端字段会原样透传，不做裁剪。
+  完整字段清单见 `omres-cli describe perf indicator-update`。
 
 ## 破坏性操作
 

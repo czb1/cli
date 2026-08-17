@@ -506,6 +506,17 @@
             "description": "搜索项目模块概览，获取serviceName到moduleId的映射",
             "example": "omres-cli overallview search --body '{\"projectId\":\"123\"}'"
           }
+        },
+        {
+          "http": {
+            "path": "/myapi/overallview/getAllMicroService",
+            "method": "GET"
+          },
+          "cli": {
+            "action": "micro-service-list",
+            "description": "查询全部微服务，用于把实际服务名（如SmcExecSvc）映射到belongService服务ID",
+            "example": "omres-cli overallview micro-service-list"
+          }
         }
       ]
     },
@@ -521,6 +532,55 @@
             "action": "auto-gen-id",
             "description": "自动生成性能指标ID（支持metric和mu两种类型）",
             "example": "omres-cli resource auto-gen-id --neName UNC --belongService 203 --idType metric --taskId 47754 --muId 9"
+          }
+        },
+        {
+          "http": {
+            "path": "/api/resource/perf/northIdRange/autoGenId",
+            "method": "GET"
+          },
+          "cli": {
+            "action": "north-auto-gen-id",
+            "description": "自动生成网管侧（北向）测量单元ID/指标ID，即 nmMuId 与 nmMetricId；belongService 用网管侧服务ID（如114）",
+            "example": "omres-cli resource north-auto-gen-id --neName UNC --belongService 114 --idType mu --checkDeleted false"
+          }
+        }
+      ]
+    },
+    "perf": {
+      "description": "性能指标组（测量单元）与指标注册",
+      "resources": [
+        {
+          "http": {
+            "path": "/api/perf/object/indicatorGroup/insert",
+            "method": "POST"
+          },
+          "cli": {
+            "action": "indicator-group-add",
+            "description": "新建指标组（测量单元）并向网管注册，muId 与 nmMuId 需先由 resource auto-gen-id / north-auto-gen-id 取得",
+            "example": "omres-cli perf indicator-group-add --taskId 47754 --body '{\"mocId\":6,\"mocChName\":\"RATTYPE\",\"belongService\":203,\"serviceInfo\":\"basicBizService/ompublic\",\"realServiceNames\":[\"SmcExecSvc\"],\"realServicesName\":\"SmcExecSvc\",\"nmMfId\":1929445378,\"muId\":\"55\",\"muName\":\"指定RATTYPE的CGW 4G会话管理失败流程\",\"monitorType\":1,\"dimensionsCalc\":\"否\",\"isRealTimeMonitor\":\"否\",\"defaultPeriod\":\"5\",\"isCombine\":\"是\",\"isHide\":\"否\",\"stringResId\":\"MU_12156\",\"nmMuId\":\"1929445469\"}'"
+          }
+        },
+        {
+          "http": {
+            "path": "/api/perf/object/indicator/manage",
+            "method": "POST"
+          },
+          "cli": {
+            "action": "indicator-add",
+            "description": "在指标组下登记指标ID与名称（新增指标第一步），随后用 indicator-update 补齐完整属性",
+            "example": "omres-cli perf indicator-add --taskId 47754 --belongService 203 --body '{\"metricId\":\"103856\",\"metricName\":\"指定RATTYPE的CGW发送 PDU Session Establishment Reject消息数\",\"meType\":0,\"belongService\":203,\"muId\":55}'"
+          }
+        },
+        {
+          "http": {
+            "path": "/api/perf/object/indicator",
+            "method": "POST"
+          },
+          "cli": {
+            "action": "indicator-update",
+            "description": "保存指标完整属性并向网管注册（算法、值类型、语言资源、测量点、nmMetricId 等）",
+            "example": "omres-cli perf indicator-update --taskId 47754 --metricId 103856 --belongService 203 --body-file ./indicator.json"
           }
         }
       ]
