@@ -49,6 +49,27 @@ DATA_OBJ = {"type": "object", "description": "返回数据"}
 DATA_ARR = {"type": "array", "items": {"type": "object"}, "description": "返回列表"}
 
 
+def raw_resp(schema):
+    """Response override for endpoints that do NOT use the {code,msg,data} shape.
+
+    性能指标相关接口返回的是 {status, data, message}，用 code=0 判成功会误判，
+    所以这些接口直接给出自己的响应 schema。
+    """
+    return {"200": {"description": "OK", "schema": schema}}
+
+
+def status_resp(data_desc, message_desc):
+    """{"status":true,"data":...,"message":...} 形式的响应。"""
+    return raw_resp({
+        "type": "object",
+        "properties": {
+            "status": {"type": "boolean", "description": "是否成功；false 表示业务失败"},
+            "data": data_desc,
+            "message": {"type": "string", "description": message_desc},
+        },
+    })
+
+
 def body(props, required):
     """props: list of (name, type, desc). required: list of names."""
     schema_props = {}
@@ -88,6 +109,10 @@ def path_param(name, typ, desc):
     return {"name": name, "in": "path", "required": True, "type": typ, "description": desc}
 
 
+def query_param(name, typ, required, desc):
+    return {"name": name, "in": "query", "required": required, "type": typ, "description": desc}
+
+
 def form_param(name, typ, required, desc):
     return {"name": name, "in": "formData", "required": required, "type": typ, "description": desc}
 
@@ -95,13 +120,14 @@ def form_param(name, typ, required, desc):
 paths = {}
 
 
-def add(p, method, summary, params, tags, data=None, consumes=None, produces=None):
-    entry = {
-        "summary": summary,
-        "tags": tags,
-        "parameters": params,
-        "responses": resp(data),
-    }
+def add(p, method, summary, params, tags, data=None, consumes=None, produces=None,
+        description=None, responses=None):
+    entry = {"summary": summary}
+    if description:
+        entry["description"] = description
+    entry["tags"] = tags
+    entry["parameters"] = params
+    entry["responses"] = responses if responses is not None else resp(data)
     if consumes:
         entry["consumes"] = consumes
     if produces:
@@ -528,7 +554,7 @@ add("/sbbapi/task/exportStruct/{taskId}/{taskName}/{version}", "post",
     ["Task"])
 
 # 30. 获取导出Go Struct结果
-add("/sbbapi/task/getExportStructResult/{taskId}/{taskName}", "post",
+add("/sbbapi/task/getExportStructResult/{taskId}/{taskName}", "get",
     "获取导出Go Struct的异步任务结果",
     [path_param("taskId", "string", "任务ID"),
      path_param("taskName", "string", "任务名称（后端未使用）")],
@@ -613,6 +639,463 @@ add("/sbbapi/moc/generateScriptFile/{taskId}/{mocId}/{mocName}/{scriptOper}/{isG
     ["Moc"], produces=["application/octet-stream"])
 
 
+# 37. 搜索项目模块概览
+add("/myapi/overallview/search", "post", "搜索项目模块概览",
+    body([("projectId", "string", "项目/任务ID")], ["projectId"]),
+    ["OverallView"],
+    data={"type": "array", "description": "模块概览列表",
+          "items": {"type": "object", "properties": {
+              "id": {"type": "integer", "description": "模块ID"},
+              "serviceName": {"type": "string", "description": "服务名称"},
+              "moduleName": {"type": "string", "description": "模块名称"},
+          }}})
+
+# 38. 删除工程/任务（破坏性）
+add("/api/task/deleteOne", "post", "删除单个工程/任务",
+    body([("taskId", "integer", "要删除的工程/任务ID（数字）")], ["taskId"]),
+    ["Task"],
+    description='破坏性操作：删除后不可恢复。响应为 {"status":true} 形式，status=false 表示删除失败。',
+    responses=raw_resp({"type": "object", "properties": {
+        "status": {"type": "boolean", "description": "是否删除成功"},
+    }}))
+
+# ---------------------------------------------------------------------------
+# 性能指标注册（指标组/测量单元 + 指标）
+#
+# 这几个接口有严格的先后顺序，前一步拿到的 ID 是后一步的入参：
+#   getAllMicroService  → belongService
+#   idRange/autoGenId      idType=mu     → muId
+#   northIdRange/autoGenId idType=mu     → nmMuId
+#   indicatorGroup/insert                → 建指标组
+#   idRange/autoGenId      idType=metric → metricId（要带 muId）
+#   indicator/manage                     → 登记指标ID与名称
+#   northIdRange/autoGenId idType=metric → nmMetricId
+#   indicator                            → 补齐指标完整属性
+# 它们统一以 {"status":false} 表达业务失败，不是 {code:0}。
+
+AUTOGEN_RESP = raw_resp({"type": "object", "properties": {
+    "status": {"type": "boolean", "description": "操作是否成功"},
+    "data": {"type": "integer", "description": "生成的ID值"},
+    "message": {"type": "string", "description": "提示信息，成功时为null"},
+}})
+
+PERF_RESP = status_resp({"type": "string", "description": "返回数据，通常为空"},
+                        "提示信息，如「新增成功。」")
+
+# 39. 自动生成本地测量单元ID/指标ID
+add("/api/resource/perf/idRange/autoGenId", "get", "自动生成性能指标ID",
+    [query_param("neName", "string", True, "NE名称，如 UNC"),
+     query_param("belongService", "integer", True, "归属服务ID，如 203"),
+     query_param("idType", "string", True, "ID类型，metric 或 mu"),
+     query_param("taskId", "integer", True, "任务ID，如 47754"),
+     query_param("muId", "integer", False, "MU ID，如 9（idType=mu时可留空）")],
+    ["Resource"], responses=AUTOGEN_RESP)
+
+# 40. 查询全部微服务
+add("/myapi/overallview/getAllMicroService", "get", "查询全部微服务", [], ["OverallView"],
+    description="返回全部微服务信息，用于把「实际服务列表」（如 SmcExecSvc）映射到注册指标组/指标时要用的 belongService 服务ID。无入参。",
+    responses=raw_resp({
+        "type": "object",
+        "description": "微服务列表（含服务ID与服务名）。后端返回结构原样透传，不做裁剪。",
+    }))
+
+# 41. 自动生成网管侧（北向）测量单元ID/指标ID
+add("/api/resource/perf/northIdRange/autoGenId", "get",
+    "自动生成网管侧（北向）测量单元/指标ID",
+    [query_param("neName", "string", True, "NE名称，如 UNC"),
+     query_param("belongService", "integer", True, "网管侧归属服务ID，如 114"),
+     query_param("idType", "string", True, "ID类型：mu=网管测量单元ID，metric=网管指标ID"),
+     query_param("checkDeleted", "boolean", False, "是否复用已删除的ID，默认 false")],
+    ["Resource"],
+    description="生成向网管注册时使用的 nmMuId（idType=mu）或 nmMetricId（idType=metric）。"
+                "注意 belongService 用的是网管侧服务ID（如 114），与 idRange/autoGenId 的服务ID（如 203）不是同一个。",
+    responses=AUTOGEN_RESP)
+
+# 42. 新建指标组（测量单元）
+add("/api/perf/object/indicatorGroup/insert", "post", "新建指标组（测量单元）并向网管注册",
+    [query_param("taskId", "integer", True, "任务/工程ID，如 47754")] +
+    body([("mocId", "integer", "对象（MOC）ID，如接入类型对应的 MOC ID"),
+          ("mocChName", "string", "对象中文名，如 RATTYPE"),
+          ("belongService", "integer", "归属服务ID，如 203（由 overallview micro-service-list 查得）"),
+          ("serviceInfo", "string", "托管微服务，如 basicBizService/ompublic"),
+          ("realServiceNames", {"type": "array",
+                                "description": '实际服务列表，如 ["SmcExecSvc"]',
+                                "items": {"type": "string"}}, "实际服务列表"),
+          ("realServicesName", "string", "实际服务列表的字符串形式，多个用逗号分隔，如 SmcExecSvc"),
+          ("nmMfId", "integer", "所属功能集ID，如 1929445378（SMF会话管理）"),
+          ("muId", "string", "测量单元ID，由 resource auto-gen-id --idType mu 获取"),
+          ("muName", "string", "测量单元名称，如「指定RATTYPE的CGW 4G会话管理失败流程」"),
+          ("muChMeaning", "string", "测量单元含义（中文）"),
+          ("muEnMeaning", "string", "测量单元含义（英文）"),
+          ("monitorType", "integer", "监控类型，1=性能统计"),
+          ("dimensionsCalc", "string", "是否向父对象聚合指标：是/否"),
+          ("isRealTimeMonitor", "string", "是否支持实时监控：是/否"),
+          ("defaultPeriod", "string", "默认任务周期（分钟），如 5"),
+          ("defaultReportBasicMe", "string", "默认上报的基础指标，可为空串"),
+          ("isCombine", "string", "是否支持复合周期：是/否"),
+          ("defaultMetricRange", "string", "默认指标范围，可为 null"),
+          ("isHide", "string", "是否隐藏：是/否"),
+          ("stringResId", "string", "语言资源ID，格式 MU_<测量单元ID>，如 MU_12156"),
+          ("monitorId", "string", "监控ID，可为 null"),
+          ("perfIndsMacroDefine", "string", "性能指标宏定义，可为空串"),
+          ("nmMuId", "string", "网管测量单元ID，由 resource north-auto-gen-id --idType mu 获取")],
+         ["belongService", "muId", "muName", "monitorType", "stringResId", "nmMuId"]),
+    ["Perf"],
+    description="新增性能测量单元（指标组）。muId 来自 resource auto-gen-id --idType mu，"
+                "nmMuId 来自 resource north-auto-gen-id --idType mu，二者必须先取到再调用本接口。"
+                "响应 status=false 表示业务失败。",
+    responses=PERF_RESP)
+
+# 43. 在指标组下登记指标ID与名称
+add("/api/perf/object/indicator/manage", "post", "在指标组下新建指标（登记指标ID与名称）",
+    [query_param("taskId", "integer", True, "任务/工程ID，如 47754"),
+     query_param("belongService", "integer", True, "归属服务ID，如 203")] +
+    body([("metricId", "string", "指标ID，由 resource auto-gen-id --idType metric --muId <muId> 获取"),
+          ("metricName", "string", "指标名称"),
+          ("meType", "integer", "指标类型，0=数值指标"),
+          ("belongService", "integer", "归属服务ID，如 203"),
+          ("muId", "integer", "所属指标组（测量单元）ID")],
+         ["metricId", "metricName", "meType", "belongService", "muId"]),
+    ["Perf"],
+    description="把 resource auto-gen-id --idType metric 拿到的指标ID登记到指定测量单元下。"
+                "登记后再调用 perf indicator-update 补齐指标的完整属性。响应 status=false 表示业务失败。",
+    responses=PERF_RESP)
+
+# 44. 保存指标完整属性（向网管注册指标）
+add("/api/perf/object/indicator", "post", "保存指标完整属性（向网管注册指标）",
+    [query_param("taskId", "integer", True, "任务/工程ID，如 47754"),
+     query_param("metricId", "integer", True, "指标ID，需与请求体的 metricId 一致"),
+     query_param("belongService", "integer", True, "归属服务ID，如 203")] +
+    body([("muId", "integer", "所属指标组（测量单元）ID"),
+          ("metricId", "integer", "指标ID"),
+          ("metricName", "string", "指标名称"),
+          ("meType", "integer", "指标类型，0=数值指标"),
+          ("belongService", "integer", "归属服务ID，如 203"),
+          ("zoom", "string", "指标值修正系数，如 1"),
+          ("isNeedMultiCalc", "string", "是否支持单指标多算法：是/否"),
+          ("serviceCalcMode", "string", "服务实例间计算方式，如 ACCL"),
+          ("dimensionCalcMode", "string", "维度间计算方式，如 ACCL"),
+          ("periodCalcMode", "string", "复合周期间计算方式，如 ACCL"),
+          ("formular", "string", "计算公式，普通数值指标留空"),
+          ("valueType", "string", "指标值类型，如 INT32"),
+          ("metricUnitName", "string", "指标单位名称，如「个」"),
+          ("meStringResId", "string", "指标语言资源ID，格式 <组件名>_<指标ID>，如 SMC_13718"),
+          ("meUnitStringResId", "string", "指标单位资源ID，如 UNIT_0"),
+          ("defaultValue", "string", "指标初始默认值，如 0"),
+          ("meMinValue", "string", "指标最小值，可为 null"),
+          ("meMaxValue", "string", "指标最大值，可为 null"),
+          ("isServiceCalcExcludeDefaultValue", "string", "是否参与实例间计算：是/否"),
+          ("isOpen2ui", "string", "是否开放本地UI：是/否"),
+          ("isOpen2nm", "string", "是否开放网管：是/否"),
+          ("nmMetricId", "string", "网管指标ID，由 resource north-auto-gen-id --idType metric 获取"),
+          ("isHide", "string", "是否隐藏指标：是/否"),
+          ("isKpiCheck", "string", "是否支持指标检测：是/否"),
+          ("perfindZhMeaningname", "string", "性能指标含义（中文）"),
+          ("perfindEnMeaningname", "string", "性能指标含义（英文）"),
+          ("measuringpoinZhDesc", "string", "测量点描述（中文）"),
+          ("measuringpoinEnDesc", "string", "测量点描述（英文）"),
+          ("measurementType", "string", "测量类型，如「当统计周期时间大于采集周期时，取统计周期内采集周期的累加值」"),
+          ("isHaveGraphic", "string", "是否有图示：是/否"),
+          ("graphicId", "string", "图ID，如 fig<网管指标ID>01.png"),
+          ("graphicCh", "string", "图示（中文）"),
+          ("graphicEn", "string", "图示（英文）"),
+          ("relatedZhNote", "string", "图注（中文）"),
+          ("relatedEnNote", "string", "图注（英文）"),
+          ("isProductKpi", "string", "是否产品KPI，可为 null"),
+          ("label", "string", "标签，可为空串"),
+          ("orderValue", "integer", "指标排序值"),
+          ("realServicesName", "string", "实际服务列表，可为空串"),
+          ("instanceProp", "string", "实例属性，可为空串"),
+          ("podPeriod", "string", "pod周期，可为空串"),
+          ("isBasicMe", "string", "是否基础指标，可为 null"),
+          ("monitorId", "string", "监控ID，可为 null"),
+          ("isSupport5sMonitor", "string", "是否支持5秒监控，可为 null"),
+          ("isDefaultReport", "string", "是否默认上报，可为 null"),
+          ("isMoreThanBillion", "string", "指标值是否可能超过十亿，可为 null"),
+          ("isScanMe", "string", "是否扫描指标，可为 null"),
+          ("scanPeriod", "string", "扫描周期，可为 null"),
+          ("scanType", "string", "扫描类型，可为 null"),
+          ("assistMeId", "string", "辅助指标ID，可为 null"),
+          ("convergenceNode", "string", "汇聚节点，可为 null"),
+          ("scanMultiInstanceCalcMode", "string", "扫描指标多实例计算方式，可为 null"),
+          ("scanMultiPeriodCalcMode", "string", "扫描指标多周期计算方式，可为 null"),
+          ("precisionConvertMultiple", "string", "精度转换倍数，可为 null"),
+          ("meUseDomain", "string", "指标使用域，可为 null"),
+          ("switchDotAreaConfig", "string", "开关点区域配置，可为 null"),
+          ("kpiTypeId", "string", "KPI类型ID，可为 null"),
+          ("kpiZhType", "string", "KPI类型（中文）"),
+          ("kpiEnType", "string", "KPI类型（英文）"),
+          ("kpiReferenceRangeZh", "string", "KPI参考范围（中文）"),
+          ("kpiReferenceRangeEn", "string", "KPI参考范围（英文）"),
+          ("isSetDefaultCfg", "string", "是否设置默认配置"),
+          ("detectionPeriod", "string", "检测周期"),
+          ("checkAlgorithm", "string", "检测算法"),
+          ("upperThreshold", "string", "上门限"),
+          ("lowerThreshold", "string", "下门限"),
+          ("chainUpThld", "string", "环比上门限"),
+          ("chainLowThld", "string", "环比下门限"),
+          ("minDetectValue", "string", "最小检测值"),
+          ("isReportAlarms", "string", "是否上报告警"),
+          ("moiName", "string", "MOI名称"),
+          ("perfIndthresholdceiling", "string", "性能指标门限上限，可为 null"),
+          ("perfIndThresholdBottom", "string", "性能指标门限下限，可为 null"),
+          ("performanceAndMonitor", "string", "性能与监控，可为 null"),
+          ("netconf", "string", "netconf 配置，可为 null"),
+          ("isDefineMetric", "string", "是否自定义指标，可为 null"),
+          ("isSupportUsc", "string", "是否支持USC，可为 null"),
+          ("perfCounter", "string", "性能计数器，可为 null"),
+          ("perfType", "string", "性能类型，可为 null"),
+          ("openToUI", "string", "是否开放UI（旧字段），可为 null"),
+          ("isCacKeyMetric", "string", "是否CAC关键指标，可为 null"),
+          ("vformular", "string", "虚拟指标公式"),
+          ("isResourceMe", "string", "是否资源类指标，可为 null"),
+          ("fluctuationCfg", "string", "波动配置，可为 null"),
+          ("sequentialVolatility", "string", "环比波动率，可为 null")],
+         ["muId", "metricId", "metricName", "meType", "belongService",
+          "valueType", "meStringResId", "nmMetricId"]),
+    ["Perf"],
+    description="在 perf indicator-add 登记指标ID之后调用，写入算法、值类型、语言资源、测量点、网管指标ID等完整属性。"
+                "查询参数中的 metricId 必须与请求体中的 metricId 一致。"
+                "请求体字段较多，未在此列出的后端字段会原样透传，不做裁剪。响应 status=false 表示业务失败。",
+    responses=PERF_RESP)
+
+
+# ---------------------------------------------------------------------------
+# 告警建模（45~55）
+#
+# 这批接口返回的是 {status, message} / {status, message, data}，不是 {code,msg,data}，
+# 所以统一用 ALARM_OK / alarm_list_resp，不要走默认的 resp()。
+ALARM_OK = raw_resp({
+    "type": "object",
+    "properties": {
+        "status": {"type": "boolean", "description": "是否成功；false 表示业务失败"},
+        "message": {"type": "string", "description": "提示信息"},
+    },
+})
+
+
+def alarm_list_resp(item_obj, desc):
+    return status_resp(arr_of(item_obj, desc), "提示信息")
+
+
+# 告警内部主键 id 与后端分配的告警号 alarmId 是两个东西，反复出现，抽出来统一措辞。
+ALARM_INTERNAL_ID = "所属告警的内部主键ID（alarm list 返回的 id，不是告警号 alarmId）"
+ALARM_ID_IS_INTERNAL = "告警内部主键ID（alarm list 返回的 id，不是告警号 alarmId）"
+
+
+def service_fields(id_type, id_desc):
+    return [("id", id_type, id_desc),
+            ("serviceName", "string", "告警服务名称"),
+            ("microServiceType", "string", "微服务类型，如 udgService / basicBizService"),
+            ("microServiceName", "string", "微服务名称，如 udgompublic / ompublic")]
+
+
+def alarm_fields(id_type, id_desc):
+    return [
+        ("id", id_type, id_desc),
+        ("serviceId", "integer", "所属告警服务ID，取自 alarm-service list 返回的 id"),
+        ("alarmId", "string", "告警号，由后端分配（如 \"100910\"），注意与内部主键 id 不是一回事"),
+        ("mocName", "string", "MOC名称"),
+        ("alarmEnglishName", "string", "告警英文名"),
+        ("alarmChineseName", "string", "告警中文名"),
+        ("alarmTypeId", "integer", "告警类型ID"),
+        ("alarmLevelId", "integer", "告警级别ID"),
+        ("eventTypeId", "integer", "事件类型ID"),
+        ("isCheck", "integer", "是否核查"),
+        ("isGlobal", "integer", "是否全局告警"),
+        ("isAutoClean", "integer", "是否自动清除"),
+        ("transientPeriod", "integer", "瞬断周期（秒），默认90"),
+        ("toggleStartPeriod", "integer", "频繁告警统计起始周期（秒），默认300"),
+        ("toggleEndPeriod", "integer", "频繁告警统计结束周期（秒），默认300"),
+        ("toggleThreshold", "integer", "频繁告警阈值，默认3"),
+        ("alarmName", "string", "告警名称标识"),
+        ("northObjType", "string", "北向对象类型"),
+        ("alarmCreReasonCh", "string", "告警产生原因（中文）"),
+        ("alarmCreReasonEn", "string", "告警产生原因（英文）"),
+        ("isSuppress", "integer", "是否抑制"),
+        ("largeParticlesType", "integer", "大颗粒类型"),
+        ("nlsType", "string", "NLS类型"),
+        ("assist", "string", "辅助信息"),
+        ("ossAlarmLevel", "string", "OSS告警级别，如 \"三级告警\""),
+        ("alarmExplain", "string", "告警解释"),
+        ("applyNe", "string", "适用网元"),
+        ("mobileLogicClassify", "string", "移动-逻辑分类，如 \"硬件告警\""),
+        ("mobileLogicClassifyChild", "string", "移动-逻辑子分类，如 \"CPU硬件告警\""),
+        ("mobileAffectToDevice", "string", "移动-对设备的影响"),
+        ("mobileAffectToBusiness", "string", "移动-对业务的影响"),
+        ("mobileIsRelatedPeer", "string", "移动-是否关联对端，\"是\"/\"否\""),
+        ("unicomLogicClassify", "string", "联通-逻辑分类"),
+        ("unicomLogicClassifyChild", "string", "联通-逻辑子分类"),
+        ("unicomAffectToDevice", "string", "联通-对设备的影响"),
+        ("unicomAffectToBusiness", "string", "联通-对业务的影响"),
+    ]
+
+
+def enum_fields(id_type, id_desc, with_list=False):
+    f = [("id", id_type, id_desc),
+         ("alarmInternalId", "integer", ALARM_INTERNAL_ID),
+         ("enumType", "string", "枚举类型"),
+         ("enumName", "string", "枚举类型名称")]
+    if with_list:
+        f.append(("alarmEnumList",
+                  {"type": "array", "items": {"type": "object"}},
+                  "该枚举类型下的枚举值列表，list 接口通常返回 null"))
+    return f
+
+
+def para_fields(id_type, id_desc, length_type):
+    return [
+        ("id", id_type, id_desc),
+        ("alarmInternalId", "integer", ALARM_INTERNAL_ID),
+        ("paramEnglishAbbreviationName", "string", "参数英文缩写名，新增时只需传这一个字段"),
+        ("paramEnglishName", "string", "参数英文名"),
+        ("paramChineseName", "string", "参数中文名"),
+        ("paramLength", length_type, "参数长度"),
+        ("paramClassId", "integer", "参数类别ID"),
+        ("paramTypeId", "integer", "参数类型ID"),
+        ("enumTypeId", "integer", "关联的枚举类型ID，取自 alarm-enum list 返回的 id"),
+        ("alarmId", "integer", "关联告警ID"),
+        ("paramMeanCh", "string", "参数含义（中文）"),
+        ("paramMeanEn", "string", "参数含义（英文）"),
+        ("isAllowEdit", "integer", "是否允许编辑"),
+        ("paramOrder", "integer", "参数顺序，取自 alarm-para list 返回的 paramOrder"),
+    ]
+
+
+# 45. 新增或修改告警服务
+add("/api/alarmService/insertOrUpdate", "post", "新增或修改告警服务",
+    body([("taskId", "integer", "工程/任务ID"),
+          ("alarmServiceTable",
+           obj(service_fields("string", "告警服务内部主键ID。新增传空字符串 \"\"，修改传 alarm-service list 返回的 id"),
+               ["serviceName"], "告警服务信息"),
+           "告警服务信息")],
+         ["taskId", "alarmServiceTable"]),
+    ["Alarm"], responses=ALARM_OK)
+
+# 46. 查询告警服务列表
+add("/api/alarmService/list", "post", "查询告警服务列表",
+    body([("taskId", "integer", "工程/任务ID")], ["taskId"]),
+    ["Alarm"],
+    description="新建告警服务后用本接口按 serviceName 反查其 id，该 id 即后续告警接口的 serviceId。",
+    responses=alarm_list_resp(
+        obj(service_fields("integer", "告警服务内部主键ID，即后续的 serviceId"), None, "告警服务"),
+        "告警服务列表"))
+
+# 47. 新增或修改告警（含告警配置信息）
+add("/api/alarm/insertOrUpdate", "post", "新增或修改告警（含告警配置信息）",
+    body([("taskId", "integer", "工程/任务ID"),
+          ("alarmTable",
+           obj(alarm_fields("string", "告警内部主键ID。新增传空字符串 \"\"，修改传 alarm list 返回的 id"),
+               ["serviceId", "alarmChineseName", "alarmEnglishName"],
+               "告警信息，新建时未知字段可省略或传 null"),
+           "告警信息")],
+         ["taskId", "alarmTable"]),
+    ["Alarm"],
+    description="同一接口覆盖两种用法：新建时只传 serviceId + 中英文名（id 传空字符串），"
+                "后端分配 alarmId；补全配置时传回 list 拿到的 id、serviceId、alarmId 再带上级别/分类等字段。",
+    responses=ALARM_OK)
+
+# 48. 查询指定告警服务下的告警列表
+add("/api/alarm/list", "post", "查询指定告警服务下的告警列表",
+    body([("taskId", "integer", "工程/任务ID"),
+          ("serviceId", "integer", "告警服务ID，取自 alarm-service list 返回的 id")],
+         ["taskId", "serviceId"]),
+    ["Alarm"],
+    description="响应里的 id 是告警内部主键（后续 alarmInternalId 用它），"
+                "alarmId 是后端分配的告警号字符串，两者不要混用。",
+    responses=alarm_list_resp(
+        obj(alarm_fields("integer", "告警内部主键ID，即后续的 alarmInternalId"), None, "告警"),
+        "告警列表"))
+
+# 49. 新增或修改告警枚举类型
+add("/api/alarmEnum/insertOrUpdate", "post", "新增或修改告警枚举类型",
+    body([("taskId", "integer", "工程/任务ID"),
+          ("alarmEnumTable",
+           obj(enum_fields("string", "枚举类型内部主键ID。新增传空字符串 \"\"，修改传 alarm-enum list 返回的 id"),
+               ["alarmInternalId", "enumType", "enumName"], "告警枚举类型信息"),
+           "告警枚举类型信息")],
+         ["taskId", "alarmEnumTable"]),
+    ["Alarm"], responses=ALARM_OK)
+
+# 50. 查询告警枚举类型列表
+add("/api/alarmEnum/list", "post", "查询告警枚举类型列表",
+    body([("taskId", "integer", "工程/任务ID"),
+          ("alarmId", "integer", ALARM_ID_IS_INTERNAL)],
+         ["taskId", "alarmId"]),
+    ["Alarm"],
+    description="注意入参名虽叫 alarmId，实际要传告警的内部主键 id（alarm list 返回的 id），不是告警号字符串。",
+    responses=alarm_list_resp(
+        obj(enum_fields("integer", "枚举类型ID，即创建枚举值时的 enumTypeId", with_list=True), None, "枚举类型"),
+        "枚举类型列表"))
+
+# 51. 新增或修改告警枚举值
+add("/api/alarmEnumValue/insertOrUpdate", "post", "新增或修改告警枚举值",
+    body([("taskId", "integer", "工程/任务ID"),
+          ("alarmEnumValueTable",
+           obj([("id", "string", "枚举值内部主键ID。新增传空字符串 \"\" 或省略"),
+                ("enumTypeId", "integer", "所属枚举类型ID，取自 alarm-enum list 返回的 id"),
+                ("iValue", "string", "枚举整型值"),
+                ("englishSvalue", "string", "枚举英文名"),
+                ("chineseSvalue", "string", "枚举中文名"),
+                ("itemMeanEn", "string", "枚举含义（英文），无内容填 NA"),
+                ("itemMeanCh", "string", "枚举含义（中文）")],
+               ["enumTypeId", "iValue"], "告警枚举值信息"),
+           "告警枚举值信息")],
+         ["taskId", "alarmEnumValueTable"]),
+    ["Alarm"], responses=ALARM_OK)
+
+# 52. 新增或修改告警参数
+add("/api/alarmPara/insertOrUpdate", "post", "新增或修改告警参数",
+    body([("taskId", "integer", "工程/任务ID"),
+          ("isAllowEdit", "integer", "是否允许编辑，与 alarmParaTable 平级，新增参数时传 1"),
+          ("alarmParaTable",
+           obj(para_fields("string",
+                           "告警参数内部主键ID。新增传空字符串 \"\" 或省略，补全时传 alarm-para list 返回的 id",
+                           "string"),
+               ["alarmInternalId", "paramEnglishAbbreviationName"], "告警参数信息"),
+           "告警参数信息")],
+         ["taskId", "alarmParaTable"]),
+    ["Alarm"],
+    description="分两步用：先只传 alarmInternalId + paramEnglishAbbreviationName 建参数占位"
+                "（可带 isAllowEdit=1），再用 alarm-para list 拿到 id 与 paramOrder 后回传完整字段补全。",
+    responses=ALARM_OK)
+
+# 53. 查询告警参数列表
+add("/api/alarmPara/list", "post", "查询告警参数列表",
+    body([("taskId", "integer", "工程/任务ID"),
+          ("alarmId", "integer", ALARM_ID_IS_INTERNAL)],
+         ["taskId", "alarmId"]),
+    ["Alarm"],
+    description="注意入参名虽叫 alarmId，实际要传告警的内部主键 id（alarm list 返回的 id），不是告警号字符串。",
+    responses=alarm_list_resp(
+        obj(para_fields("integer", "告警参数内部主键ID", "integer"), None, "告警参数"),
+        "告警参数列表"))
+
+# 54. 导出前校验
+add("/sbbapi/task/exportValidate/", "post", "导出前校验（路径末尾的斜杠是后端要求，不能去掉）",
+    body([("taskId", "integer", "工程/任务ID")], ["taskId"]),
+    ["Task"],
+    responses=raw_resp({
+        "type": "object",
+        "properties": {
+            "status": {"type": "boolean", "description": "是否成功；false 表示业务失败"},
+            "show": {"type": "boolean", "description": "校验结果是否需要展示"},
+            "message": {"type": "string", "description": "提示信息"},
+        },
+    }))
+
+# 55. 判断工程是否含有告警
+add("/api/task/isTaskIncludeAlarm", "post", "判断工程是否含有告警（multipart 表单，不是 JSON）",
+    [form_param("taskId", "string", True, "工程/任务ID")],
+    ["Task"], consumes=["multipart/form-data"],
+    responses=raw_resp({
+        "type": "object",
+        "properties": {
+            "status": {"type": "boolean", "description": "是否成功；false 表示业务失败"},
+            "message": {"type": "string", "description": "提示信息，如 \"工程含有告警\""},
+        },
+    }))
+
 swagger = {
     "swagger": "2.0",
     "info": {
@@ -630,8 +1113,9 @@ swagger = {
 
 out = os.path.join(os.path.dirname(__file__), "..", "internal", "cli", "docs", "swagger.json")
 out = os.path.abspath(out)
-with open(out, "w", encoding="utf-8") as f:
+with open(out, "w", encoding="utf-8", newline="\n") as f:
     json.dump(swagger, f, ensure_ascii=False, indent=2)
+    f.write("\n")  # 末尾换行，避免每次生成都和仓库里的文件差一行
 
 # count operations
 n = sum(len(m) for m in paths.values())

@@ -2501,93 +2501,6 @@
         ]
       }
     },
-    "/sbbapi/task/exportValidate/": {
-      "post": {
-        "summary": "导出前校验（路径末尾的斜杠是后端要求，不能去掉）",
-        "tags": [
-          "Task"
-        ],
-        "parameters": [
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "type": "object",
-              "properties": {
-                "taskId": {
-                  "type": "integer",
-                  "description": "工程/任务ID"
-                }
-              },
-              "required": [
-                "taskId"
-              ]
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "schema": {
-              "type": "object",
-              "properties": {
-                "status": {
-                  "type": "boolean",
-                  "description": "业务是否成功"
-                },
-                "show": {
-                  "type": "boolean",
-                  "description": "校验结果是否需要展示"
-                },
-                "message": {
-                  "type": "string",
-                  "description": "提示信息"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/task/isTaskIncludeAlarm": {
-      "post": {
-        "summary": "判断工程是否含有告警（multipart 表单，不是 JSON）",
-        "tags": [
-          "Task"
-        ],
-        "parameters": [
-          {
-            "name": "taskId",
-            "in": "formData",
-            "required": true,
-            "type": "string",
-            "description": "工程/任务ID"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "schema": {
-              "type": "object",
-              "properties": {
-                "status": {
-                  "type": "boolean",
-                  "description": "业务是否成功"
-                },
-                "message": {
-                  "type": "string",
-                  "description": "提示信息，如 \"工程含有告警\""
-                }
-              }
-            }
-          }
-        },
-        "consumes": [
-          "multipart/form-data"
-        ]
-      }
-    },
     "/list/infoCode/add": {
       "post": {
         "summary": "添加错误码",
@@ -3178,6 +3091,737 @@
         }
       }
     },
+    "/myapi/overallview/getAllMicroService": {
+      "get": {
+        "summary": "查询全部微服务",
+        "description": "返回全部微服务信息，用于把「实际服务列表」（如 SmcExecSvc）映射到注册指标组/指标时要用的 belongService 服务ID。无入参。",
+        "tags": [
+          "OverallView"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "description": "微服务列表（含服务ID与服务名）。后端返回结构原样透传，不做裁剪。"
+            }
+          }
+        }
+      }
+    },
+    "/api/resource/perf/northIdRange/autoGenId": {
+      "get": {
+        "summary": "自动生成网管侧（北向）测量单元/指标ID",
+        "description": "生成向网管注册时使用的 nmMuId（idType=mu）或 nmMetricId（idType=metric）。注意 belongService 用的是网管侧服务ID（如 114），与 idRange/autoGenId 的服务ID（如 203）不是同一个。",
+        "tags": [
+          "Resource"
+        ],
+        "parameters": [
+          {
+            "name": "neName",
+            "in": "query",
+            "required": true,
+            "type": "string",
+            "description": "NE名称，如 UNC"
+          },
+          {
+            "name": "belongService",
+            "in": "query",
+            "required": true,
+            "type": "integer",
+            "description": "网管侧归属服务ID，如 114"
+          },
+          {
+            "name": "idType",
+            "in": "query",
+            "required": true,
+            "type": "string",
+            "description": "ID类型：mu=网管测量单元ID，metric=网管指标ID"
+          },
+          {
+            "name": "checkDeleted",
+            "in": "query",
+            "required": false,
+            "type": "boolean",
+            "description": "是否复用已删除的ID，默认 false"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "boolean",
+                  "description": "操作是否成功"
+                },
+                "data": {
+                  "type": "integer",
+                  "description": "生成的ID值"
+                },
+                "message": {
+                  "type": "string",
+                  "description": "提示信息，成功时为null"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/perf/object/indicatorGroup/insert": {
+      "post": {
+        "summary": "新建指标组（测量单元）并向网管注册",
+        "description": "新增性能测量单元（指标组）。muId 来自 resource auto-gen-id --idType mu，nmMuId 来自 resource north-auto-gen-id --idType mu，二者必须先取到再调用本接口。响应 status=false 表示业务失败。",
+        "tags": [
+          "Perf"
+        ],
+        "parameters": [
+          {
+            "name": "taskId",
+            "in": "query",
+            "required": true,
+            "type": "integer",
+            "description": "任务/工程ID，如 47754"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "mocId": {
+                  "type": "integer",
+                  "description": "对象（MOC）ID，如接入类型对应的 MOC ID"
+                },
+                "mocChName": {
+                  "type": "string",
+                  "description": "对象中文名，如 RATTYPE"
+                },
+                "belongService": {
+                  "type": "integer",
+                  "description": "归属服务ID，如 203（由 overallview micro-service-list 查得）"
+                },
+                "serviceInfo": {
+                  "type": "string",
+                  "description": "托管微服务，如 basicBizService/ompublic"
+                },
+                "realServiceNames": {
+                  "type": "array",
+                  "description": "实际服务列表，如 [\"SmcExecSvc\"]",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "realServicesName": {
+                  "type": "string",
+                  "description": "实际服务列表的字符串形式，多个用逗号分隔，如 SmcExecSvc"
+                },
+                "nmMfId": {
+                  "type": "integer",
+                  "description": "所属功能集ID，如 1929445378（SMF会话管理）"
+                },
+                "muId": {
+                  "type": "string",
+                  "description": "测量单元ID，由 resource auto-gen-id --idType mu 获取"
+                },
+                "muName": {
+                  "type": "string",
+                  "description": "测量单元名称，如「指定RATTYPE的CGW 4G会话管理失败流程」"
+                },
+                "muChMeaning": {
+                  "type": "string",
+                  "description": "测量单元含义（中文）"
+                },
+                "muEnMeaning": {
+                  "type": "string",
+                  "description": "测量单元含义（英文）"
+                },
+                "monitorType": {
+                  "type": "integer",
+                  "description": "监控类型，1=性能统计"
+                },
+                "dimensionsCalc": {
+                  "type": "string",
+                  "description": "是否向父对象聚合指标：是/否"
+                },
+                "isRealTimeMonitor": {
+                  "type": "string",
+                  "description": "是否支持实时监控：是/否"
+                },
+                "defaultPeriod": {
+                  "type": "string",
+                  "description": "默认任务周期（分钟），如 5"
+                },
+                "defaultReportBasicMe": {
+                  "type": "string",
+                  "description": "默认上报的基础指标，可为空串"
+                },
+                "isCombine": {
+                  "type": "string",
+                  "description": "是否支持复合周期：是/否"
+                },
+                "defaultMetricRange": {
+                  "type": "string",
+                  "description": "默认指标范围，可为 null"
+                },
+                "isHide": {
+                  "type": "string",
+                  "description": "是否隐藏：是/否"
+                },
+                "stringResId": {
+                  "type": "string",
+                  "description": "语言资源ID，格式 MU_<测量单元ID>，如 MU_12156"
+                },
+                "monitorId": {
+                  "type": "string",
+                  "description": "监控ID，可为 null"
+                },
+                "perfIndsMacroDefine": {
+                  "type": "string",
+                  "description": "性能指标宏定义，可为空串"
+                },
+                "nmMuId": {
+                  "type": "string",
+                  "description": "网管测量单元ID，由 resource north-auto-gen-id --idType mu 获取"
+                }
+              },
+              "required": [
+                "belongService",
+                "muId",
+                "muName",
+                "monitorType",
+                "stringResId",
+                "nmMuId"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "boolean",
+                  "description": "是否成功；false 表示业务失败"
+                },
+                "data": {
+                  "type": "string",
+                  "description": "返回数据，通常为空"
+                },
+                "message": {
+                  "type": "string",
+                  "description": "提示信息，如「新增成功。」"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/perf/object/indicator/manage": {
+      "post": {
+        "summary": "在指标组下新建指标（登记指标ID与名称）",
+        "description": "把 resource auto-gen-id --idType metric 拿到的指标ID登记到指定测量单元下。登记后再调用 perf indicator-update 补齐指标的完整属性。响应 status=false 表示业务失败。",
+        "tags": [
+          "Perf"
+        ],
+        "parameters": [
+          {
+            "name": "taskId",
+            "in": "query",
+            "required": true,
+            "type": "integer",
+            "description": "任务/工程ID，如 47754"
+          },
+          {
+            "name": "belongService",
+            "in": "query",
+            "required": true,
+            "type": "integer",
+            "description": "归属服务ID，如 203"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "metricId": {
+                  "type": "string",
+                  "description": "指标ID，由 resource auto-gen-id --idType metric --muId <muId> 获取"
+                },
+                "metricName": {
+                  "type": "string",
+                  "description": "指标名称"
+                },
+                "meType": {
+                  "type": "integer",
+                  "description": "指标类型，0=数值指标"
+                },
+                "belongService": {
+                  "type": "integer",
+                  "description": "归属服务ID，如 203"
+                },
+                "muId": {
+                  "type": "integer",
+                  "description": "所属指标组（测量单元）ID"
+                }
+              },
+              "required": [
+                "metricId",
+                "metricName",
+                "meType",
+                "belongService",
+                "muId"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "boolean",
+                  "description": "是否成功；false 表示业务失败"
+                },
+                "data": {
+                  "type": "string",
+                  "description": "返回数据，通常为空"
+                },
+                "message": {
+                  "type": "string",
+                  "description": "提示信息，如「新增成功。」"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/perf/object/indicator": {
+      "post": {
+        "summary": "保存指标完整属性（向网管注册指标）",
+        "description": "在 perf indicator-add 登记指标ID之后调用，写入算法、值类型、语言资源、测量点、网管指标ID等完整属性。查询参数中的 metricId 必须与请求体中的 metricId 一致。请求体字段较多，未在此列出的后端字段会原样透传，不做裁剪。响应 status=false 表示业务失败。",
+        "tags": [
+          "Perf"
+        ],
+        "parameters": [
+          {
+            "name": "taskId",
+            "in": "query",
+            "required": true,
+            "type": "integer",
+            "description": "任务/工程ID，如 47754"
+          },
+          {
+            "name": "metricId",
+            "in": "query",
+            "required": true,
+            "type": "integer",
+            "description": "指标ID，需与请求体的 metricId 一致"
+          },
+          {
+            "name": "belongService",
+            "in": "query",
+            "required": true,
+            "type": "integer",
+            "description": "归属服务ID，如 203"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "muId": {
+                  "type": "integer",
+                  "description": "所属指标组（测量单元）ID"
+                },
+                "metricId": {
+                  "type": "integer",
+                  "description": "指标ID"
+                },
+                "metricName": {
+                  "type": "string",
+                  "description": "指标名称"
+                },
+                "meType": {
+                  "type": "integer",
+                  "description": "指标类型，0=数值指标"
+                },
+                "belongService": {
+                  "type": "integer",
+                  "description": "归属服务ID，如 203"
+                },
+                "zoom": {
+                  "type": "string",
+                  "description": "指标值修正系数，如 1"
+                },
+                "isNeedMultiCalc": {
+                  "type": "string",
+                  "description": "是否支持单指标多算法：是/否"
+                },
+                "serviceCalcMode": {
+                  "type": "string",
+                  "description": "服务实例间计算方式，如 ACCL"
+                },
+                "dimensionCalcMode": {
+                  "type": "string",
+                  "description": "维度间计算方式，如 ACCL"
+                },
+                "periodCalcMode": {
+                  "type": "string",
+                  "description": "复合周期间计算方式，如 ACCL"
+                },
+                "formular": {
+                  "type": "string",
+                  "description": "计算公式，普通数值指标留空"
+                },
+                "valueType": {
+                  "type": "string",
+                  "description": "指标值类型，如 INT32"
+                },
+                "metricUnitName": {
+                  "type": "string",
+                  "description": "指标单位名称，如「个」"
+                },
+                "meStringResId": {
+                  "type": "string",
+                  "description": "指标语言资源ID，格式 <组件名>_<指标ID>，如 SMC_13718"
+                },
+                "meUnitStringResId": {
+                  "type": "string",
+                  "description": "指标单位资源ID，如 UNIT_0"
+                },
+                "defaultValue": {
+                  "type": "string",
+                  "description": "指标初始默认值，如 0"
+                },
+                "meMinValue": {
+                  "type": "string",
+                  "description": "指标最小值，可为 null"
+                },
+                "meMaxValue": {
+                  "type": "string",
+                  "description": "指标最大值，可为 null"
+                },
+                "isServiceCalcExcludeDefaultValue": {
+                  "type": "string",
+                  "description": "是否参与实例间计算：是/否"
+                },
+                "isOpen2ui": {
+                  "type": "string",
+                  "description": "是否开放本地UI：是/否"
+                },
+                "isOpen2nm": {
+                  "type": "string",
+                  "description": "是否开放网管：是/否"
+                },
+                "nmMetricId": {
+                  "type": "string",
+                  "description": "网管指标ID，由 resource north-auto-gen-id --idType metric 获取"
+                },
+                "isHide": {
+                  "type": "string",
+                  "description": "是否隐藏指标：是/否"
+                },
+                "isKpiCheck": {
+                  "type": "string",
+                  "description": "是否支持指标检测：是/否"
+                },
+                "perfindZhMeaningname": {
+                  "type": "string",
+                  "description": "性能指标含义（中文）"
+                },
+                "perfindEnMeaningname": {
+                  "type": "string",
+                  "description": "性能指标含义（英文）"
+                },
+                "measuringpoinZhDesc": {
+                  "type": "string",
+                  "description": "测量点描述（中文）"
+                },
+                "measuringpoinEnDesc": {
+                  "type": "string",
+                  "description": "测量点描述（英文）"
+                },
+                "measurementType": {
+                  "type": "string",
+                  "description": "测量类型，如「当统计周期时间大于采集周期时，取统计周期内采集周期的累加值」"
+                },
+                "isHaveGraphic": {
+                  "type": "string",
+                  "description": "是否有图示：是/否"
+                },
+                "graphicId": {
+                  "type": "string",
+                  "description": "图ID，如 fig<网管指标ID>01.png"
+                },
+                "graphicCh": {
+                  "type": "string",
+                  "description": "图示（中文）"
+                },
+                "graphicEn": {
+                  "type": "string",
+                  "description": "图示（英文）"
+                },
+                "relatedZhNote": {
+                  "type": "string",
+                  "description": "图注（中文）"
+                },
+                "relatedEnNote": {
+                  "type": "string",
+                  "description": "图注（英文）"
+                },
+                "isProductKpi": {
+                  "type": "string",
+                  "description": "是否产品KPI，可为 null"
+                },
+                "label": {
+                  "type": "string",
+                  "description": "标签，可为空串"
+                },
+                "orderValue": {
+                  "type": "integer",
+                  "description": "指标排序值"
+                },
+                "realServicesName": {
+                  "type": "string",
+                  "description": "实际服务列表，可为空串"
+                },
+                "instanceProp": {
+                  "type": "string",
+                  "description": "实例属性，可为空串"
+                },
+                "podPeriod": {
+                  "type": "string",
+                  "description": "pod周期，可为空串"
+                },
+                "isBasicMe": {
+                  "type": "string",
+                  "description": "是否基础指标，可为 null"
+                },
+                "monitorId": {
+                  "type": "string",
+                  "description": "监控ID，可为 null"
+                },
+                "isSupport5sMonitor": {
+                  "type": "string",
+                  "description": "是否支持5秒监控，可为 null"
+                },
+                "isDefaultReport": {
+                  "type": "string",
+                  "description": "是否默认上报，可为 null"
+                },
+                "isMoreThanBillion": {
+                  "type": "string",
+                  "description": "指标值是否可能超过十亿，可为 null"
+                },
+                "isScanMe": {
+                  "type": "string",
+                  "description": "是否扫描指标，可为 null"
+                },
+                "scanPeriod": {
+                  "type": "string",
+                  "description": "扫描周期，可为 null"
+                },
+                "scanType": {
+                  "type": "string",
+                  "description": "扫描类型，可为 null"
+                },
+                "assistMeId": {
+                  "type": "string",
+                  "description": "辅助指标ID，可为 null"
+                },
+                "convergenceNode": {
+                  "type": "string",
+                  "description": "汇聚节点，可为 null"
+                },
+                "scanMultiInstanceCalcMode": {
+                  "type": "string",
+                  "description": "扫描指标多实例计算方式，可为 null"
+                },
+                "scanMultiPeriodCalcMode": {
+                  "type": "string",
+                  "description": "扫描指标多周期计算方式，可为 null"
+                },
+                "precisionConvertMultiple": {
+                  "type": "string",
+                  "description": "精度转换倍数，可为 null"
+                },
+                "meUseDomain": {
+                  "type": "string",
+                  "description": "指标使用域，可为 null"
+                },
+                "switchDotAreaConfig": {
+                  "type": "string",
+                  "description": "开关点区域配置，可为 null"
+                },
+                "kpiTypeId": {
+                  "type": "string",
+                  "description": "KPI类型ID，可为 null"
+                },
+                "kpiZhType": {
+                  "type": "string",
+                  "description": "KPI类型（中文）"
+                },
+                "kpiEnType": {
+                  "type": "string",
+                  "description": "KPI类型（英文）"
+                },
+                "kpiReferenceRangeZh": {
+                  "type": "string",
+                  "description": "KPI参考范围（中文）"
+                },
+                "kpiReferenceRangeEn": {
+                  "type": "string",
+                  "description": "KPI参考范围（英文）"
+                },
+                "isSetDefaultCfg": {
+                  "type": "string",
+                  "description": "是否设置默认配置"
+                },
+                "detectionPeriod": {
+                  "type": "string",
+                  "description": "检测周期"
+                },
+                "checkAlgorithm": {
+                  "type": "string",
+                  "description": "检测算法"
+                },
+                "upperThreshold": {
+                  "type": "string",
+                  "description": "上门限"
+                },
+                "lowerThreshold": {
+                  "type": "string",
+                  "description": "下门限"
+                },
+                "chainUpThld": {
+                  "type": "string",
+                  "description": "环比上门限"
+                },
+                "chainLowThld": {
+                  "type": "string",
+                  "description": "环比下门限"
+                },
+                "minDetectValue": {
+                  "type": "string",
+                  "description": "最小检测值"
+                },
+                "isReportAlarms": {
+                  "type": "string",
+                  "description": "是否上报告警"
+                },
+                "moiName": {
+                  "type": "string",
+                  "description": "MOI名称"
+                },
+                "perfIndthresholdceiling": {
+                  "type": "string",
+                  "description": "性能指标门限上限，可为 null"
+                },
+                "perfIndThresholdBottom": {
+                  "type": "string",
+                  "description": "性能指标门限下限，可为 null"
+                },
+                "performanceAndMonitor": {
+                  "type": "string",
+                  "description": "性能与监控，可为 null"
+                },
+                "netconf": {
+                  "type": "string",
+                  "description": "netconf 配置，可为 null"
+                },
+                "isDefineMetric": {
+                  "type": "string",
+                  "description": "是否自定义指标，可为 null"
+                },
+                "isSupportUsc": {
+                  "type": "string",
+                  "description": "是否支持USC，可为 null"
+                },
+                "perfCounter": {
+                  "type": "string",
+                  "description": "性能计数器，可为 null"
+                },
+                "perfType": {
+                  "type": "string",
+                  "description": "性能类型，可为 null"
+                },
+                "openToUI": {
+                  "type": "string",
+                  "description": "是否开放UI（旧字段），可为 null"
+                },
+                "isCacKeyMetric": {
+                  "type": "string",
+                  "description": "是否CAC关键指标，可为 null"
+                },
+                "vformular": {
+                  "type": "string",
+                  "description": "虚拟指标公式"
+                },
+                "isResourceMe": {
+                  "type": "string",
+                  "description": "是否资源类指标，可为 null"
+                },
+                "fluctuationCfg": {
+                  "type": "string",
+                  "description": "波动配置，可为 null"
+                },
+                "sequentialVolatility": {
+                  "type": "string",
+                  "description": "环比波动率，可为 null"
+                }
+              },
+              "required": [
+                "muId",
+                "metricId",
+                "metricName",
+                "meType",
+                "belongService",
+                "valueType",
+                "meStringResId",
+                "nmMetricId"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "boolean",
+                  "description": "是否成功；false 表示业务失败"
+                },
+                "data": {
+                  "type": "string",
+                  "description": "返回数据，通常为空"
+                },
+                "message": {
+                  "type": "string",
+                  "description": "提示信息，如「新增成功。」"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/alarmService/insertOrUpdate": {
       "post": {
         "summary": "新增或修改告警服务",
@@ -3237,7 +3881,7 @@
               "properties": {
                 "status": {
                   "type": "boolean",
-                  "description": "业务是否成功，false 时 CLI 会以 JSON-RPC error 返回"
+                  "description": "是否成功；false 表示业务失败"
                 },
                 "message": {
                   "type": "string",
@@ -3252,10 +3896,10 @@
     "/api/alarmService/list": {
       "post": {
         "summary": "查询告警服务列表",
+        "description": "新建告警服务后用本接口按 serviceName 反查其 id，该 id 即后续告警接口的 serviceId。",
         "tags": [
           "Alarm"
         ],
-        "description": "新建告警服务后用本接口按 serviceName 反查其 id，该 id 即后续告警接口的 serviceId。",
         "parameters": [
           {
             "name": "body",
@@ -3283,17 +3927,13 @@
               "properties": {
                 "status": {
                   "type": "boolean",
-                  "description": "业务是否成功，false 时 CLI 会以 JSON-RPC error 返回"
-                },
-                "message": {
-                  "type": "string",
-                  "description": "提示信息"
+                  "description": "是否成功；false 表示业务失败"
                 },
                 "data": {
                   "type": "array",
-                  "description": "告警服务列表",
                   "items": {
                     "type": "object",
+                    "description": "告警服务",
                     "properties": {
                       "id": {
                         "type": "integer",
@@ -3312,7 +3952,12 @@
                         "description": "微服务名称，如 udgompublic / ompublic"
                       }
                     }
-                  }
+                  },
+                  "description": "告警服务列表"
+                },
+                "message": {
+                  "type": "string",
+                  "description": "提示信息"
                 }
               }
             }
@@ -3323,10 +3968,10 @@
     "/api/alarm/insertOrUpdate": {
       "post": {
         "summary": "新增或修改告警（含告警配置信息）",
+        "description": "同一接口覆盖两种用法：新建时只传 serviceId + 中英文名（id 传空字符串），后端分配 alarmId；补全配置时传回 list 拿到的 id、serviceId、alarmId 再带上级别/分类等字段。",
         "tags": [
           "Alarm"
         ],
-        "description": "同一接口覆盖两种用法：新建时只传 serviceId + 中英文名（id 传空字符串），后端分配 alarmId；补全配置时传回 list 拿到的 id、serviceId、alarmId 再带上级别/分类等字段。",
         "parameters": [
           {
             "name": "body",
@@ -3510,7 +4155,7 @@
               "properties": {
                 "status": {
                   "type": "boolean",
-                  "description": "业务是否成功，false 时 CLI 会以 JSON-RPC error 返回"
+                  "description": "是否成功；false 表示业务失败"
                 },
                 "message": {
                   "type": "string",
@@ -3525,10 +4170,10 @@
     "/api/alarm/list": {
       "post": {
         "summary": "查询指定告警服务下的告警列表",
+        "description": "响应里的 id 是告警内部主键（后续 alarmInternalId 用它），alarmId 是后端分配的告警号字符串，两者不要混用。",
         "tags": [
           "Alarm"
         ],
-        "description": "响应里的 id 是告警内部主键（后续 alarmInternalId 用它），alarmId 是后端分配的告警号字符串，两者不要混用。",
         "parameters": [
           {
             "name": "body",
@@ -3561,17 +4206,13 @@
               "properties": {
                 "status": {
                   "type": "boolean",
-                  "description": "业务是否成功，false 时 CLI 会以 JSON-RPC error 返回"
-                },
-                "message": {
-                  "type": "string",
-                  "description": "提示信息"
+                  "description": "是否成功；false 表示业务失败"
                 },
                 "data": {
                   "type": "array",
-                  "description": "告警列表",
                   "items": {
                     "type": "object",
+                    "description": "告警",
                     "properties": {
                       "id": {
                         "type": "integer",
@@ -3718,7 +4359,12 @@
                         "description": "联通-对业务的影响"
                       }
                     }
-                  }
+                  },
+                  "description": "告警列表"
+                },
+                "message": {
+                  "type": "string",
+                  "description": "提示信息"
                 }
               }
             }
@@ -3787,7 +4433,7 @@
               "properties": {
                 "status": {
                   "type": "boolean",
-                  "description": "业务是否成功，false 时 CLI 会以 JSON-RPC error 返回"
+                  "description": "是否成功；false 表示业务失败"
                 },
                 "message": {
                   "type": "string",
@@ -3802,10 +4448,10 @@
     "/api/alarmEnum/list": {
       "post": {
         "summary": "查询告警枚举类型列表",
+        "description": "注意入参名虽叫 alarmId，实际要传告警的内部主键 id（alarm list 返回的 id），不是告警号字符串。",
         "tags": [
           "Alarm"
         ],
-        "description": "注意入参名虽叫 alarmId，实际要传告警的内部主键 id（alarm list 返回的 id），不是告警号字符串。",
         "parameters": [
           {
             "name": "body",
@@ -3838,17 +4484,13 @@
               "properties": {
                 "status": {
                   "type": "boolean",
-                  "description": "业务是否成功，false 时 CLI 会以 JSON-RPC error 返回"
-                },
-                "message": {
-                  "type": "string",
-                  "description": "提示信息"
+                  "description": "是否成功；false 表示业务失败"
                 },
                 "data": {
                   "type": "array",
-                  "description": "枚举类型列表",
                   "items": {
                     "type": "object",
+                    "description": "枚举类型",
                     "properties": {
                       "id": {
                         "type": "integer",
@@ -3870,11 +4512,15 @@
                         "type": "array",
                         "items": {
                           "type": "object"
-                        },
-                        "description": "该枚举类型下的枚举值列表，list 接口通常返回 null"
+                        }
                       }
                     }
-                  }
+                  },
+                  "description": "枚举类型列表"
+                },
+                "message": {
+                  "type": "string",
+                  "description": "提示信息"
                 }
               }
             }
@@ -3954,7 +4600,7 @@
               "properties": {
                 "status": {
                   "type": "boolean",
-                  "description": "业务是否成功，false 时 CLI 会以 JSON-RPC error 返回"
+                  "description": "是否成功；false 表示业务失败"
                 },
                 "message": {
                   "type": "string",
@@ -3969,10 +4615,10 @@
     "/api/alarmPara/insertOrUpdate": {
       "post": {
         "summary": "新增或修改告警参数",
+        "description": "分两步用：先只传 alarmInternalId + paramEnglishAbbreviationName 建参数占位（可带 isAllowEdit=1），再用 alarm-para list 拿到 id 与 paramOrder 后回传完整字段补全。",
         "tags": [
           "Alarm"
         ],
-        "description": "分两步用：先只传 alarmInternalId + paramEnglishAbbreviationName 建参数占位（可带 isAllowEdit=1），再用 alarm-para list 拿到 id 与 paramOrder 后回传完整字段补全。",
         "parameters": [
           {
             "name": "body",
@@ -4071,7 +4717,7 @@
               "properties": {
                 "status": {
                   "type": "boolean",
-                  "description": "业务是否成功，false 时 CLI 会以 JSON-RPC error 返回"
+                  "description": "是否成功；false 表示业务失败"
                 },
                 "message": {
                   "type": "string",
@@ -4086,10 +4732,10 @@
     "/api/alarmPara/list": {
       "post": {
         "summary": "查询告警参数列表",
+        "description": "注意入参名虽叫 alarmId，实际要传告警的内部主键 id（alarm list 返回的 id），不是告警号字符串。",
         "tags": [
           "Alarm"
         ],
-        "description": "注意入参名虽叫 alarmId，实际要传告警的内部主键 id（alarm list 返回的 id），不是告警号字符串。",
         "parameters": [
           {
             "name": "body",
@@ -4122,17 +4768,13 @@
               "properties": {
                 "status": {
                   "type": "boolean",
-                  "description": "业务是否成功，false 时 CLI 会以 JSON-RPC error 返回"
-                },
-                "message": {
-                  "type": "string",
-                  "description": "提示信息"
+                  "description": "是否成功；false 表示业务失败"
                 },
                 "data": {
                   "type": "array",
-                  "description": "告警参数列表",
                   "items": {
                     "type": "object",
+                    "description": "告警参数",
                     "properties": {
                       "id": {
                         "type": "integer",
@@ -4191,12 +4833,104 @@
                         "description": "参数顺序，取自 alarm-para list 返回的 paramOrder"
                       }
                     }
-                  }
+                  },
+                  "description": "告警参数列表"
+                },
+                "message": {
+                  "type": "string",
+                  "description": "提示信息"
                 }
               }
             }
           }
         }
+      }
+    },
+    "/sbbapi/task/exportValidate/": {
+      "post": {
+        "summary": "导出前校验（路径末尾的斜杠是后端要求，不能去掉）",
+        "tags": [
+          "Task"
+        ],
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "taskId": {
+                  "type": "integer",
+                  "description": "工程/任务ID"
+                }
+              },
+              "required": [
+                "taskId"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "boolean",
+                  "description": "是否成功；false 表示业务失败"
+                },
+                "show": {
+                  "type": "boolean",
+                  "description": "校验结果是否需要展示"
+                },
+                "message": {
+                  "type": "string",
+                  "description": "提示信息"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/task/isTaskIncludeAlarm": {
+      "post": {
+        "summary": "判断工程是否含有告警（multipart 表单，不是 JSON）",
+        "tags": [
+          "Task"
+        ],
+        "parameters": [
+          {
+            "name": "taskId",
+            "in": "formData",
+            "required": true,
+            "type": "string",
+            "description": "工程/任务ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "boolean",
+                  "description": "是否成功；false 表示业务失败"
+                },
+                "message": {
+                  "type": "string",
+                  "description": "提示信息，如 \"工程含有告警\""
+                }
+              }
+            }
+          }
+        },
+        "consumes": [
+          "multipart/form-data"
+        ]
       }
     }
   }
