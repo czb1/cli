@@ -99,11 +99,11 @@
                 },
                 "neType": {
                   "type": "string",
-                  "description": "网元类型"
+                  "description": "网元类型，如 UNC"
                 },
                 "productType": {
                   "type": "string",
-                  "description": "产品类型"
+                  "description": "产品类型，如 \"0\""
                 },
                 "version": {
                   "type": "string",
@@ -134,17 +134,13 @@
             "schema": {
               "type": "object",
               "properties": {
-                "code": {
+                "status": {
+                  "type": "boolean",
+                  "description": "是否成功；false 表示业务失败"
+                },
+                "extendData": {
                   "type": "integer",
-                  "description": "状态码，0=成功"
-                },
-                "msg": {
-                  "type": "string",
-                  "description": "提示信息"
-                },
-                "data": {
-                  "type": "object",
-                  "description": "返回数据"
+                  "description": "新建工程/任务的 taskId"
                 }
               }
             }

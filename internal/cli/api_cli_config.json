@@ -38,8 +38,8 @@
           },
           "cli": {
             "action": "create",
-            "description": "新建工程/任务",
-            "example": "omres-cli task create --body '{\"taskName\":\"demo\"}'"
+            "description": "新建工程/任务，响应的 extendData 即新工程的 taskId",
+            "example": "omres-cli task create --body '{\"taskName\":\"percreate\",\"neType\":\"UNC\",\"productType\":\"0\"}'"
           }
         },
         {

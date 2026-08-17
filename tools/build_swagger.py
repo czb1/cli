@@ -147,13 +147,20 @@ add("/api/task/create", "post", "新建工程/任务",
     body([("taskName", "string", "任务名称"),
           ("inputResName", "string", "输入资源名称"),
           ("creator", "string", "创建人"),
-          ("neType", "string", "网元类型"),
-          ("productType", "string", "产品类型"),
+          ("neType", "string", "网元类型，如 UNC"),
+          ("productType", "string", "产品类型，如 \"0\""),
           ("version", "string", "版本号"),
           ("buildVersion", "integer", "构建版本"),
           ("selectedServices", "string", "选中服务"),
           ("gitBranch", "string", "Git分支")], ["taskName"]),
-    ["Task"], data=DATA_OBJ)
+    ["Task"],
+    responses=raw_resp({
+        "type": "object",
+        "properties": {
+            "status": {"type": "boolean", "description": "是否成功；false 表示业务失败"},
+            "extendData": {"type": "integer", "description": "新建工程/任务的 taskId"},
+        },
+    }))
 
 # 3. 上传文件 (multipart/form-data)
 add("/api/upload/uploadFile", "post", "上传并解压zip/rar文件",
