@@ -98,7 +98,8 @@ CLI 只提供原子命令，**不做编排**——下面每一步的入参需要
 
 | # | 命令 | 依赖上一步的 |
 |---|------|------------|
-| 1 | `alarm-service upsert` | — |
+| 0 | `task create` | — ；响应的 `extendData` 即 `taskId`，后续各步都要带（沿用已有工程可跳过） |
+| 1 | `alarm-service upsert` | `taskId` |
 | 2 | `alarm-service list` | 按 `serviceName` 找到 `id` → 后续 `serviceId` |
 | 3 | `alarm upsert` | `serviceId` |
 | 4 | `alarm list` | `serviceId`；取响应的 `id` 与 `alarmId` |
@@ -125,38 +126,44 @@ CLI 只提供原子命令，**不做编排**——下面每一步的入参需要
 以「指定RATTYPE的CGW发送 PDU Session Establishment Reject消息数」为例：
 
 ```bash
-# 0) 按实际服务列表（如 SmcExecSvc）查出 belongService 服务ID
+# 0) 新建工程，拿 taskId（后续每一步的 --taskId 都用它；沿用已有工程可跳过）
+omres-cli task create --body '{"taskName":"percreate","neType":"UNC","productType":"0"}'
+# → {"status":true,"extendData":48279}   ← extendData 就是 taskId
+
+# 1) 按实际服务列表（如 SmcExecSvc）查出 belongService 服务ID
 omres-cli overallview micro-service-list
 
-# 1) 取测量单元ID（muId）
+# 2) 取测量单元ID（muId）
 omres-cli resource auto-gen-id --neName UNC --belongService 203 --idType mu --taskId 47754
 # → {"status":true,"data":55}
 
-# 2) 取网管测量单元ID（nmMuId）；注意 belongService 用网管侧服务ID
+# 3) 取网管测量单元ID（nmMuId）；注意 belongService 用网管侧服务ID
 omres-cli resource north-auto-gen-id --neName UNC --belongService 114 --idType mu --checkDeleted false
 # → {"status":true,"data":1929445469}
 
-# 3) 注册指标组（测量单元）
+# 4) 注册指标组（测量单元）
 omres-cli perf indicator-group-add --taskId 47754 --body-file ./mu.json
 
-# 4) 在该指标组下取指标ID（muId 必填）
+# 5) 在该指标组下取指标ID（muId 必填）
 omres-cli resource auto-gen-id --neName UNC --belongService 203 --idType metric --taskId 47754 --muId 55
 # → {"status":true,"data":103856}
 
-# 5) 登记指标ID与名称
+# 6) 登记指标ID与名称
 omres-cli perf indicator-add --taskId 47754 --belongService 203 \
   --body '{"metricId":"103856","metricName":"指定RATTYPE的CGW发送 PDU Session Establishment Reject消息数","meType":0,"belongService":203,"muId":55}'
 
-# 6) 取网管指标ID（nmMetricId）
+# 7) 取网管指标ID（nmMetricId）
 omres-cli resource north-auto-gen-id --neName UNC --belongService 114 --idType metric --checkDeleted false
 # → {"status":true,"data":1929446634}
 
-# 7) 补齐指标完整属性（算法、值类型、语言资源、测量点、nmMetricId 等）
+# 8) 补齐指标完整属性（算法、值类型、语言资源、测量点、nmMetricId 等）
 omres-cli perf indicator-update --taskId 47754 --metricId 103856 --belongService 203 --body-file ./metric.json
 ```
 
 几点约定：
 
+- 除第 1 步（`overallview micro-service-list`）和第 3/7 步（网管北向取号）外，其余每一步都要带 `--taskId`，
+  值取自第 0 步 `task create` 响应的 `extendData`。
 - `resource auto-gen-id` 与 `resource north-auto-gen-id` 是两套 ID 空间：前者是本地（`belongService` 如 203），
   后者是网管北向（`belongService` 如 114），不要混用。
 - `indicator-update` 的查询参数 `--metricId` 必须与请求体里的 `metricId` 一致。
