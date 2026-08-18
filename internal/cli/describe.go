@@ -86,6 +86,18 @@ func buildDescribe(sw *Swagger, group string, res Resource, op *Operation) map[s
 				}
 				continue
 			}
+			// 请求体是记录数组（删除类接口）：整体给出 items 的 schema。
+			if schema != nil && schema.Type == "array" {
+				params = append(params, describeParam{
+					Name:        "body",
+					Type:        "array",
+					In:          "body",
+					Required:    p.Required,
+					Description: firstNonEmpty(p.Description, schema.Description),
+					Schema:      schemaSummary(sw, schema),
+				})
+				continue
+			}
 		}
 		params = append(params, describeParam{
 			Name:        p.Name,

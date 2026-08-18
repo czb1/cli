@@ -107,6 +107,17 @@
             "description": "删除单个工程/任务（破坏性操作，需要 --yes 确认）",
             "example": "omres-cli task delete-one --body '{\"taskId\":48050}' --yes"
           }
+        },
+        {
+          "http": {
+            "path": "/api/task/deleteMany",
+            "method": "POST"
+          },
+          "cli": {
+            "action": "delete-many",
+            "description": "批量删除工程/任务（破坏性操作，需要 --yes 确认）",
+            "example": "omres-cli task delete-many --body '{\"idList\":[48314]}' --yes"
+          }
         }
       ]
     },
@@ -603,6 +614,50 @@
             "action": "indicator-update",
             "description": "保存指标完整属性并向网管注册（算法、值类型、语言资源、测量点、nmMetricId 等）",
             "example": "omres-cli perf indicator-update --taskId 47754 --metricId 103856 --belongService 203 --body-file ./indicator.json"
+          }
+        },
+        {
+          "http": {
+            "path": "/api/perf/baseInfo/languageResource/insert",
+            "method": "POST"
+          },
+          "cli": {
+            "action": "language-resource-add",
+            "description": "注册语言资源（指标组/指标的中英文描述），stringResId 要与指标组的 stringResId、指标的 meStringResId 对应",
+            "example": "omres-cli perf language-resource-add --taskId 47754 --body '{\"stringResId\":\"MU_55\",\"descriptionZh\":\"指定RATTYPE的CGW 4G会话管理失败流程\",\"descriptionEn\":\"Failed CGW 4G session management procedures for a specific RAT type\",\"belongService\":\"203\"}'"
+          }
+        },
+        {
+          "http": {
+            "path": "/api/perf/baseInfo/languageResource/delete/batch",
+            "method": "POST"
+          },
+          "cli": {
+            "action": "language-resource-delete",
+            "description": "批量删除语言资源，请求体是记录数组（破坏性操作，需要 --yes 确认）",
+            "example": "omres-cli perf language-resource-delete --taskId 47754 --body '[{\"stringResId\":\"MU_55\",\"descriptionZh\":\"指定RATTYPE的CGW 4G会话管理失败流程\",\"descriptionEn\":\"Failed CGW 4G session management procedures for a specific RAT type\",\"remark\":null,\"belongService\":203}]' --yes"
+          }
+        },
+        {
+          "http": {
+            "path": "/api/perf/object/indicatorGroup/delete/batch",
+            "method": "POST"
+          },
+          "cli": {
+            "action": "indicator-group-delete",
+            "description": "批量删除指标组（测量单元），请求体是记录数组；应先删掉其下的指标（破坏性操作，需要 --yes 确认）",
+            "example": "omres-cli perf indicator-group-delete --taskId 47754 --body-file ./mu-delete.json --yes"
+          }
+        },
+        {
+          "http": {
+            "path": "/api/perf/object/indicator/manage/delete",
+            "method": "POST"
+          },
+          "cli": {
+            "action": "indicator-delete",
+            "description": "批量删除指标，请求体是记录数组，元素可直接回传 indicator-update 用过的记录（破坏性操作，需要 --yes 确认）",
+            "example": "omres-cli perf indicator-delete --taskId 47754 --body-file ./metric-delete.json --yes"
           }
         }
       ]

@@ -4928,6 +4928,474 @@
           "multipart/form-data"
         ]
       }
+    },
+    "/api/perf/baseInfo/languageResource/insert": {
+      "post": {
+        "summary": "注册语言资源（测量单元/指标的中英文描述）",
+        "description": "为指标组或指标登记语言资源。stringResId 要与指标组的 stringResId / 指标的 meStringResId 一致，否则前端展示不出中英文描述。请求体里的 belongService 可以是字符串（如 \"203\"），后端按数字处理。响应 status=false 表示业务失败。",
+        "tags": [
+          "Perf"
+        ],
+        "parameters": [
+          {
+            "name": "taskId",
+            "in": "query",
+            "required": true,
+            "type": "integer",
+            "description": "任务/工程ID，如 47754"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "stringResId": {
+                  "type": "string",
+                  "description": "语言资源ID：测量单元用 MU_<muId>（如 MU_55），指标用 <组件名>_<指标ID>（如 SMC_10000）"
+                },
+                "descriptionZh": {
+                  "type": "string",
+                  "description": "中文描述"
+                },
+                "descriptionEn": {
+                  "type": "string",
+                  "description": "英文描述"
+                },
+                "belongService": {
+                  "type": "integer",
+                  "description": "归属服务ID，如 203"
+                }
+              },
+              "required": [
+                "stringResId",
+                "descriptionZh",
+                "descriptionEn",
+                "belongService"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "boolean",
+                  "description": "是否成功；false 表示业务失败"
+                },
+                "data": {
+                  "type": "string",
+                  "description": "返回数据，通常为空"
+                },
+                "message": {
+                  "type": "string",
+                  "description": "提示信息，如「新增成功。」"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/perf/baseInfo/languageResource/delete/batch": {
+      "post": {
+        "summary": "批量删除语言资源",
+        "description": "破坏性操作：请求体是数组，每个元素是一条完整的语言资源记录。data 返回实际删除的条数。响应 status=false 表示业务失败。",
+        "tags": [
+          "Perf"
+        ],
+        "parameters": [
+          {
+            "name": "taskId",
+            "in": "query",
+            "required": true,
+            "type": "integer",
+            "description": "任务/工程ID，如 47754"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "description": "要删除的语言资源列表，通常把注册时的记录原样回传",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "description": "要删除的语言资源记录",
+                "properties": {
+                  "stringResId": {
+                    "type": "string",
+                    "description": "语言资源ID：测量单元用 MU_<muId>（如 MU_55），指标用 <组件名>_<指标ID>（如 SMC_10000）"
+                  },
+                  "descriptionZh": {
+                    "type": "string",
+                    "description": "中文描述"
+                  },
+                  "descriptionEn": {
+                    "type": "string",
+                    "description": "英文描述"
+                  },
+                  "remark": {
+                    "type": "string",
+                    "description": "备注，可为 null"
+                  },
+                  "belongService": {
+                    "type": "integer",
+                    "description": "归属服务ID，如 203"
+                  }
+                },
+                "required": [
+                  "stringResId"
+                ]
+              },
+              "description": "要删除的语言资源列表，通常把注册时的记录原样回传"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "boolean",
+                  "description": "是否成功；false 表示业务失败"
+                },
+                "data": {
+                  "type": "integer",
+                  "description": "实际删除的记录条数"
+                },
+                "message": {
+                  "type": "string",
+                  "description": "提示信息，成功时通常为 null"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/perf/object/indicatorGroup/delete/batch": {
+      "post": {
+        "summary": "批量删除指标组（测量单元）",
+        "description": "破坏性操作：请求体是数组，元素是完整的指标组记录（可直接回传创建/查询时的记录）。删除指标组前应先删掉其下的指标。响应的 data.length 是删除条数，其余数组列出被牵连的全局配置。响应 status=false 表示业务失败。",
+        "tags": [
+          "Perf"
+        ],
+        "parameters": [
+          {
+            "name": "taskId",
+            "in": "query",
+            "required": true,
+            "type": "integer",
+            "description": "任务/工程ID，如 47754"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "description": "要删除的指标组列表",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "description": "要删除的指标组记录，字段与 perf indicator-group-add 的请求体一致，未列出的字段原样透传",
+                "properties": {
+                  "muId": {
+                    "type": "integer",
+                    "description": "测量单元ID"
+                  },
+                  "muName": {
+                    "type": "string",
+                    "description": "测量单元名称"
+                  },
+                  "mocId": {
+                    "type": "integer",
+                    "description": "对象（MOC）ID"
+                  },
+                  "belongService": {
+                    "type": "integer",
+                    "description": "归属服务ID，如 203"
+                  },
+                  "realServicesName": {
+                    "type": "string",
+                    "description": "实际服务列表，如 SmcExecSvc"
+                  },
+                  "monitorType": {
+                    "type": "integer",
+                    "description": "监控类型，1=性能统计"
+                  },
+                  "stringResId": {
+                    "type": "string",
+                    "description": "语言资源ID，格式 MU_<测量单元ID>"
+                  },
+                  "nmMuId": {
+                    "type": "integer",
+                    "description": "网管测量单元ID"
+                  },
+                  "nmMfId": {
+                    "type": "integer",
+                    "description": "所属功能集ID"
+                  },
+                  "isHide": {
+                    "type": "string",
+                    "description": "是否隐藏：是/否"
+                  }
+                },
+                "required": [
+                  "muId",
+                  "belongService"
+                ]
+              },
+              "description": "要删除的指标组列表"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "boolean",
+                  "description": "是否成功；false 表示业务失败"
+                },
+                "data": {
+                  "type": "object",
+                  "description": "删除结果",
+                  "properties": {
+                    "length": {
+                      "type": "integer",
+                      "description": "实际删除的指标组条数"
+                    },
+                    "monitorGlobal": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      },
+                      "description": "受影响的监控全局配置，为空表示无残留引用"
+                    },
+                    "monitorMetricGlobal": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      },
+                      "description": "受影响的监控指标全局配置"
+                    },
+                    "nmGlobal": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      },
+                      "description": "受影响的网管侧全局配置"
+                    },
+                    "nmMetricGlobal": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      },
+                      "description": "受影响的网管侧指标全局配置"
+                    },
+                    "innerGlobal": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      },
+                      "description": "受影响的内部全局配置"
+                    },
+                    "innerMetricGlobal": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      },
+                      "description": "受影响的内部指标全局配置"
+                    }
+                  }
+                },
+                "message": {
+                  "type": "string",
+                  "description": "提示信息，成功时通常为空串"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/perf/object/indicator/manage/delete": {
+      "post": {
+        "summary": "批量删除指标",
+        "description": "破坏性操作：请求体是数组，元素是完整的指标记录（可直接回传 perf indicator-update 用过的记录）。响应的三个数组列出被牵连的全局配置，为空表示没有残留引用。响应 status=false 表示业务失败。",
+        "tags": [
+          "Perf"
+        ],
+        "parameters": [
+          {
+            "name": "taskId",
+            "in": "query",
+            "required": true,
+            "type": "integer",
+            "description": "任务/工程ID，如 47754"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "description": "要删除的指标列表",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "description": "要删除的指标记录，字段与 perf indicator-update 的请求体一致，未列出的字段原样透传",
+                "properties": {
+                  "metricId": {
+                    "type": "integer",
+                    "description": "指标ID"
+                  },
+                  "metricName": {
+                    "type": "string",
+                    "description": "指标名称"
+                  },
+                  "muId": {
+                    "type": "integer",
+                    "description": "所属指标组（测量单元）ID"
+                  },
+                  "meType": {
+                    "type": "integer",
+                    "description": "指标类型，0=数值指标"
+                  },
+                  "belongService": {
+                    "type": "integer",
+                    "description": "归属服务ID，如 203"
+                  },
+                  "valueType": {
+                    "type": "string",
+                    "description": "指标值类型，如 INT32"
+                  },
+                  "meStringResId": {
+                    "type": "string",
+                    "description": "指标语言资源ID，如 SMC_10000"
+                  },
+                  "meUnitStringResId": {
+                    "type": "string",
+                    "description": "指标单位资源ID，如 UNIT_0"
+                  },
+                  "nmMetricId": {
+                    "type": "integer",
+                    "description": "网管指标ID"
+                  },
+                  "isHide": {
+                    "type": "string",
+                    "description": "是否隐藏：是/否"
+                  }
+                },
+                "required": [
+                  "metricId",
+                  "muId",
+                  "belongService"
+                ]
+              },
+              "description": "要删除的指标列表"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "boolean",
+                  "description": "是否成功；false 表示业务失败"
+                },
+                "data": {
+                  "type": "object",
+                  "description": "删除结果",
+                  "properties": {
+                    "monitorGlobal": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      },
+                      "description": "受影响的监控全局配置，为空表示无残留引用"
+                    },
+                    "nmGlobal": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      },
+                      "description": "受影响的网管侧全局配置"
+                    },
+                    "innerGlobal": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      },
+                      "description": "受影响的内部全局配置"
+                    }
+                  }
+                },
+                "message": {
+                  "type": "string",
+                  "description": "提示信息，成功时通常为空串"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/task/deleteMany": {
+      "post": {
+        "summary": "批量删除工程/任务",
+        "description": "破坏性操作：删除后不可恢复，一次可删多个工程。响应为 {\"status\":true} 形式，status=false 表示删除失败。只删一个工程时也可以用 task delete-one。",
+        "tags": [
+          "Task"
+        ],
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "idList": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer"
+                  },
+                  "description": "要删除的工程/任务ID列表，如 [48314]"
+                }
+              },
+              "required": [
+                "idList"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "boolean",
+                  "description": "是否删除成功"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   }
 }

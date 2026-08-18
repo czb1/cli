@@ -8,7 +8,7 @@
 - **AI 可探索**：`--help`（分层）+ `describe`（完整语义契约）。
 - **零业务逻辑**：CLI 仅作 HTTP 客户端，调用 `https://omtool.rnd.huawei.com`。
 
-覆盖接口文档中全部 **55** 个接口。
+覆盖接口文档中全部 **60** 个接口。
 
 ## 构建
 
@@ -60,12 +60,12 @@ Windows 上安装后需**重开终端**，`setx` 对已打开的窗口不生效�
 ./omres-cli raw /api/some/newEndpoint -X POST --body '{}'
 ```
 
-### 命令分组（55 接口）
+### 命令分组（60 接口）
 
 | group | actions |
 |-------|---------|
 | auth | login, status, logout |
-| task | create, export-struct, export-result, download, export-validate, include-alarm, delete-one ⚠ |
+| task | create, export-struct, export-result, download, export-validate, include-alarm, delete-one ⚠, delete-many ⚠ |
 | upload | file, parse-xml |
 | moc | add-name, select-name, insert-info, generate-script |
 | moc-field | add-name, select-name, update-info |
@@ -82,7 +82,7 @@ Windows 上安装后需**重开终端**，`setx` 对已打开的窗口不生效�
 | info-module | query-all |
 | overallview | search, micro-service-list |
 | resource | auto-gen-id, north-auto-gen-id |
-| perf | indicator-group-add, indicator-add, indicator-update |
+| perf | indicator-group-add, indicator-add, indicator-update, language-resource-add, language-resource-delete ⚠, indicator-delete ⚠, indicator-group-delete ⚠ |
 | alarm-service | upsert, list |
 | alarm | upsert, list |
 | alarm-enum | upsert, list |
@@ -158,6 +158,10 @@ omres-cli resource north-auto-gen-id --neName UNC --belongService 114 --idType m
 
 # 8) 补齐指标完整属性（算法、值类型、语言资源、测量点、nmMetricId 等）
 omres-cli perf indicator-update --taskId 47754 --metricId 103856 --belongService 203 --body-file ./metric.json
+
+# 9) 注册语言资源（指标组用 MU_<muId>，指标用 <组件名>_<指标ID>，与上面填的资源ID一一对应）
+omres-cli perf language-resource-add --taskId 47754 \
+  --body '{"stringResId":"MU_55","descriptionZh":"指定RATTYPE的CGW 4G会话管理失败流程","descriptionEn":"Failed CGW 4G session management procedures for a specific RAT type","belongService":"203"}'
 ```
 
 几点约定：
@@ -170,6 +174,32 @@ omres-cli perf indicator-update --taskId 47754 --metricId 103856 --belongService
 - 这几个接口都以 `{"status":false}` 表达业务失败，CLI 会把它转成 `Operation Failed` 错误，不会当成成功。
 - 请求体字段较多，建议用 `--body-file`；未在 swagger 中列出的后端字段会原样透传，不做裁剪。
   完整字段清单见 `omres-cli describe perf indicator-update`。
+- 语言资源缺失不会让前面几步报错，但前端/网管上看不到中英文描述，注册完记得补第 9 步。
+
+### 性能指标回滚（删除）
+
+删错或要重来时按**与创建相反的顺序**删，删除类接口的请求体是**记录数组**——
+把创建时用过的整条记录（或查询接口返回的记录）原样放进数组即可，
+未列出的字段原样透传。这几个命令都是破坏性的，需要 `--yes`：
+
+```bash
+# 1) 先删指标（指标还挂在指标组下时，指标组删不干净）
+omres-cli perf indicator-delete --taskId 47754 --body-file ./metric-delete.json --yes
+
+# 2) 再删指标组（测量单元）
+omres-cli perf indicator-group-delete --taskId 47754 --body-file ./mu-delete.json --yes
+
+# 3) 最后删语言资源
+omres-cli perf language-resource-delete --taskId 47754 \
+  --body '[{"stringResId":"MU_55","descriptionZh":"指定RATTYPE的CGW 4G会话管理失败流程","descriptionEn":"Failed CGW 4G session management procedures for a specific RAT type","remark":null,"belongService":203}]' --yes
+
+# 整个工程都不要了：批量删工程
+omres-cli task delete-many --body '{"idList":[48314]}' --yes
+```
+
+- 删除指标组/指标的响应 `data` 里那几个 `*Global` 数组，列的是被牵连的全局配置，
+  为空表示没有残留引用；`data.length` 是实际删除条数。
+- 数组请求体的字段清单同样可以用 `describe` 查：`omres-cli describe perf indicator-delete`。
 
 ## 破坏性操作
 

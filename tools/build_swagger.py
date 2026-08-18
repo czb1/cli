@@ -91,6 +91,17 @@ def body(props, required):
     }]
 
 
+def arr_body(item_obj, desc=""):
+    """请求体是一个「记录数组」（删除类接口常见）。"""
+    return [{
+        "name": "body",
+        "in": "body",
+        "required": True,
+        "description": desc,
+        "schema": {"type": "array", "items": item_obj, "description": desc},
+    }]
+
+
 def obj(props, required=None, desc=""):
     schema_props = {}
     for name, typ, d in props:
@@ -1102,6 +1113,120 @@ add("/api/task/isTaskIncludeAlarm", "post", "判断工程是否含有告警（mu
             "message": {"type": "string", "description": "提示信息，如 \"工程含有告警\""},
         },
     }))
+
+# ---------------------------------------------------------------------------
+# 语言资源与删除类接口（56~60）
+#
+# 语言资源用来给测量单元/指标提供中英文描述：指标组的 stringResId（MU_<muId>）、
+# 指标的 meStringResId（<组件名>_<指标ID>）都要有对应的语言资源记录。
+# 删除类接口的请求体是「记录数组」，通常直接把查询接口返回的整条记录回传即可。
+
+LANG_RES_FIELDS = [
+    ("stringResId", "string", "语言资源ID：测量单元用 MU_<muId>（如 MU_55），指标用 <组件名>_<指标ID>（如 SMC_10000）"),
+    ("descriptionZh", "string", "中文描述"),
+    ("descriptionEn", "string", "英文描述"),
+    ("remark", "string", "备注，可为 null"),
+    ("belongService", "integer", "归属服务ID，如 203"),
+]
+
+# 56. 注册语言资源
+add("/api/perf/baseInfo/languageResource/insert", "post", "注册语言资源（测量单元/指标的中英文描述）",
+    [query_param("taskId", "integer", True, "任务/工程ID，如 47754")] +
+    body([(n, t, d) for n, t, d in LANG_RES_FIELDS if n != "remark"],
+         ["stringResId", "descriptionZh", "descriptionEn", "belongService"]),
+    ["Perf"],
+    description="为指标组或指标登记语言资源。stringResId 要与指标组的 stringResId / 指标的 meStringResId 一致，"
+                "否则前端展示不出中英文描述。请求体里的 belongService 可以是字符串（如 \"203\"），后端按数字处理。"
+                "响应 status=false 表示业务失败。",
+    responses=PERF_RESP)
+
+# 57. 批量删除语言资源（破坏性）
+add("/api/perf/baseInfo/languageResource/delete/batch", "post", "批量删除语言资源",
+    [query_param("taskId", "integer", True, "任务/工程ID，如 47754")] +
+    arr_body(obj(LANG_RES_FIELDS, ["stringResId"], "要删除的语言资源记录"),
+             "要删除的语言资源列表，通常把注册时的记录原样回传"),
+    ["Perf"],
+    description="破坏性操作：请求体是数组，每个元素是一条完整的语言资源记录。"
+                "data 返回实际删除的条数。响应 status=false 表示业务失败。",
+    responses=status_resp({"type": "integer", "description": "实际删除的记录条数"},
+                          "提示信息，成功时通常为 null"))
+
+# 58. 批量删除指标组（测量单元）（破坏性）
+DELETE_GLOBAL_RESP_PROPS = {
+    "monitorGlobal": {"type": "array", "items": {"type": "object"},
+                      "description": "受影响的监控全局配置，为空表示无残留引用"},
+    "nmGlobal": {"type": "array", "items": {"type": "object"},
+                 "description": "受影响的网管侧全局配置"},
+    "innerGlobal": {"type": "array", "items": {"type": "object"},
+                    "description": "受影响的内部全局配置"},
+}
+
+add("/api/perf/object/indicatorGroup/delete/batch", "post", "批量删除指标组（测量单元）",
+    [query_param("taskId", "integer", True, "任务/工程ID，如 47754")] +
+    arr_body(obj([("muId", "integer", "测量单元ID"),
+                  ("muName", "string", "测量单元名称"),
+                  ("mocId", "integer", "对象（MOC）ID"),
+                  ("belongService", "integer", "归属服务ID，如 203"),
+                  ("realServicesName", "string", "实际服务列表，如 SmcExecSvc"),
+                  ("monitorType", "integer", "监控类型，1=性能统计"),
+                  ("stringResId", "string", "语言资源ID，格式 MU_<测量单元ID>"),
+                  ("nmMuId", "integer", "网管测量单元ID"),
+                  ("nmMfId", "integer", "所属功能集ID"),
+                  ("isHide", "string", "是否隐藏：是/否")],
+                 ["muId", "belongService"],
+                 "要删除的指标组记录，字段与 perf indicator-group-add 的请求体一致，"
+                 "未列出的字段原样透传"),
+             "要删除的指标组列表"),
+    ["Perf"],
+    description="破坏性操作：请求体是数组，元素是完整的指标组记录（可直接回传创建/查询时的记录）。"
+                "删除指标组前应先删掉其下的指标。响应的 data.length 是删除条数，"
+                "其余数组列出被牵连的全局配置。响应 status=false 表示业务失败。",
+    responses=status_resp(
+        obj([("length", "integer", "实际删除的指标组条数"),
+             ("monitorGlobal", {"type": "array", "items": {"type": "object"}, "description": "受影响的监控全局配置，为空表示无残留引用"}, ""),
+             ("monitorMetricGlobal", {"type": "array", "items": {"type": "object"}, "description": "受影响的监控指标全局配置"}, ""),
+             ("nmGlobal", {"type": "array", "items": {"type": "object"}, "description": "受影响的网管侧全局配置"}, ""),
+             ("nmMetricGlobal", {"type": "array", "items": {"type": "object"}, "description": "受影响的网管侧指标全局配置"}, ""),
+             ("innerGlobal", {"type": "array", "items": {"type": "object"}, "description": "受影响的内部全局配置"}, ""),
+             ("innerMetricGlobal", {"type": "array", "items": {"type": "object"}, "description": "受影响的内部指标全局配置"}, "")],
+            None, "删除结果"),
+        "提示信息，成功时通常为空串"))
+
+# 59. 批量删除指标（破坏性）
+add("/api/perf/object/indicator/manage/delete", "post", "批量删除指标",
+    [query_param("taskId", "integer", True, "任务/工程ID，如 47754")] +
+    arr_body(obj([("metricId", "integer", "指标ID"),
+                  ("metricName", "string", "指标名称"),
+                  ("muId", "integer", "所属指标组（测量单元）ID"),
+                  ("meType", "integer", "指标类型，0=数值指标"),
+                  ("belongService", "integer", "归属服务ID，如 203"),
+                  ("valueType", "string", "指标值类型，如 INT32"),
+                  ("meStringResId", "string", "指标语言资源ID，如 SMC_10000"),
+                  ("meUnitStringResId", "string", "指标单位资源ID，如 UNIT_0"),
+                  ("nmMetricId", "integer", "网管指标ID"),
+                  ("isHide", "string", "是否隐藏：是/否")],
+                 ["metricId", "muId", "belongService"],
+                 "要删除的指标记录，字段与 perf indicator-update 的请求体一致，"
+                 "未列出的字段原样透传"),
+             "要删除的指标列表"),
+    ["Perf"],
+    description="破坏性操作：请求体是数组，元素是完整的指标记录（可直接回传 perf indicator-update 用过的记录）。"
+                "响应的三个数组列出被牵连的全局配置，为空表示没有残留引用。响应 status=false 表示业务失败。",
+    responses=status_resp(
+        {"type": "object", "description": "删除结果", "properties": DELETE_GLOBAL_RESP_PROPS},
+        "提示信息，成功时通常为空串"))
+
+# 60. 批量删除工程/任务（破坏性）
+add("/api/task/deleteMany", "post", "批量删除工程/任务",
+    body([("idList", {"type": "array", "items": {"type": "integer"}},
+           "要删除的工程/任务ID列表，如 [48314]")], ["idList"]),
+    ["Task"],
+    description='破坏性操作：删除后不可恢复，一次可删多个工程。响应为 {"status":true} 形式，'
+                "status=false 表示删除失败。只删一个工程时也可以用 task delete-one。",
+    responses=raw_resp({"type": "object", "properties": {
+        "status": {"type": "boolean", "description": "是否删除成功"},
+    }}))
+
 
 swagger = {
     "swagger": "2.0",
