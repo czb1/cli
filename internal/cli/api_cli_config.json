@@ -581,8 +581,30 @@
       ]
     },
     "perf": {
-      "description": "性能指标组（测量单元）与指标注册",
+      "description": "性能维度、测量对象、指标组（测量单元）与指标注册",
       "resources": [
+        {
+          "http": {
+            "path": "/bxapi/perf/baseinfo/dimension",
+            "method": "POST"
+          },
+          "cli": {
+            "action": "dimension-add",
+            "description": "注册维度（供测量对象的 dimensionNoList 引用），查询参数是 projectId（值即 taskId）",
+            "example": "omres-cli perf dimension-add --projectId 47754 --body '{\"dimensionId\":\"56\",\"dimensionName\":\"5qi\",\"dimensionDataLength\":\"128\",\"stringResId\":\"AAA_17\",\"microService\":[\"basicBizService\",\"203\"],\"CheckMode\":\"ALL\",\"belongService\":\"203\"}'"
+          }
+        },
+        {
+          "http": {
+            "path": "/bxapi/perf/class/{belongService}/{mocId}",
+            "method": "PUT"
+          },
+          "cli": {
+            "action": "object-add",
+            "description": "注册（新增/修改）性能测量对象，路径参数依次是 belongService 与 mocId，须与请求体中的同名字段一致",
+            "example": "omres-cli perf object-add 203 36 --projectId 47754 --body-file ./moc.json"
+          }
+        },
         {
           "http": {
             "path": "/api/perf/object/indicatorGroup/insert",
@@ -658,6 +680,28 @@
             "action": "indicator-delete",
             "description": "批量删除指标，请求体是记录数组，元素可直接回传 indicator-update 用过的记录（破坏性操作，需要 --yes 确认）",
             "example": "omres-cli perf indicator-delete --taskId 47754 --body-file ./metric-delete.json --yes"
+          }
+        },
+        {
+          "http": {
+            "path": "/bxapi/perf/class/multiDel",
+            "method": "DELETE"
+          },
+          "cli": {
+            "action": "object-delete",
+            "description": "批量删除性能测量对象，删除前要先删掉其下的指标与指标组（破坏性操作，需要 --yes 确认）",
+            "example": "omres-cli perf object-delete --projectId 47754 --body '{\"perfClassList\":[{\"mocId\":\"36\",\"belongService\":203,\"nmMocId\":1929445387}]}' --yes"
+          }
+        },
+        {
+          "http": {
+            "path": "/bxapi/perf/baseinfo/dimension/multiDel",
+            "method": "DELETE"
+          },
+          "cli": {
+            "action": "dimension-delete",
+            "description": "批量删除维度，删除前要先删掉引用该维度的测量对象（破坏性操作，需要 --yes 确认）",
+            "example": "omres-cli perf dimension-delete --projectId 47754 --body '{\"dimensionList\":[{\"dimensionId\":\"56\",\"belongService\":203}]}' --yes"
           }
         }
       ]

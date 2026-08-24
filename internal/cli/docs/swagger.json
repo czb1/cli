@@ -3022,7 +3022,8 @@
     },
     "/api/resource/perf/idRange/autoGenId": {
       "get": {
-        "summary": "自动生成性能指标ID",
+        "summary": "自动生成本地测量对象/测量单元/指标ID",
+        "description": "按 idType 生成本地ID：moc=测量对象ID（mocId）、mu=测量单元ID（muId）、metric=指标ID（metricId）。idType=metric 时必须带 --muId 指明指标挂在哪个测量单元下；moc/mu 可以不带。本接口与 northIdRange/autoGenId 是两套ID空间，belongService 也不同，不要混用。",
         "tags": [
           "Resource"
         ],
@@ -3046,7 +3047,7 @@
             "in": "query",
             "required": true,
             "type": "string",
-            "description": "ID类型，metric 或 mu"
+            "description": "ID类型：mu=测量单元ID，metric=指标ID，moc=测量对象ID"
           },
           {
             "name": "taskId",
@@ -3060,7 +3061,7 @@
             "in": "query",
             "required": false,
             "type": "integer",
-            "description": "MU ID，如 9（idType=mu时可留空）"
+            "description": "MU ID，如 9（idType=mu/moc 时可留空）"
           }
         ],
         "responses": {
@@ -3108,8 +3109,8 @@
     },
     "/api/resource/perf/northIdRange/autoGenId": {
       "get": {
-        "summary": "自动生成网管侧（北向）测量单元/指标ID",
-        "description": "生成向网管注册时使用的 nmMuId（idType=mu）或 nmMetricId（idType=metric）。注意 belongService 用的是网管侧服务ID（如 114），与 idRange/autoGenId 的服务ID（如 203）不是同一个。",
+        "summary": "自动生成网管侧（北向）测量对象/测量单元/指标ID",
+        "description": "生成向网管注册时使用的 nmMocId（idType=moc）、nmMuId（idType=mu）或 nmMetricId（idType=metric）。注意 belongService 用的是网管侧服务ID（如 114），与 idRange/autoGenId 的服务ID（如 203）不是同一个。",
         "tags": [
           "Resource"
         ],
@@ -3133,7 +3134,7 @@
             "in": "query",
             "required": true,
             "type": "string",
-            "description": "ID类型：mu=网管测量单元ID，metric=网管指标ID"
+            "description": "ID类型：moc=网管测量对象ID，mu=网管测量单元ID，metric=网管指标ID"
           },
           {
             "name": "checkDeleted",
@@ -5390,6 +5391,404 @@
                 "status": {
                   "type": "boolean",
                   "description": "是否删除成功"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/bxapi/perf/baseinfo/dimension": {
+      "post": {
+        "summary": "注册维度",
+        "description": "注册一个维度，供测量对象的 dimensionNoList/dimensionNoListArray 引用。维度ID要先规划好（不像 mocId/muId 有自动取号接口）。请求体里的 belongService 是字符串（如 \"203\"），未列出的后端字段原样透传。响应 status=false 表示业务失败。",
+        "tags": [
+          "Perf"
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "query",
+            "required": true,
+            "type": "integer",
+            "description": "工程/任务ID（等同其它接口的 taskId），如 47754"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "dimensionId": {
+                  "type": "string",
+                  "description": "维度ID，全局唯一，如 56"
+                },
+                "dimensionName": {
+                  "type": "string",
+                  "description": "维度名称，如 5qi"
+                },
+                "dimensionDataLength": {
+                  "type": "string",
+                  "description": "维度数据长度，如 128"
+                },
+                "stringResId": {
+                  "type": "string",
+                  "description": "语言资源ID，如 AAA_17；用 perf language-resource-add 登记中英文描述"
+                },
+                "microService": {
+                  "type": "array",
+                  "description": "托管微服务，形如 [\"basicBizService\",\"203\"]：第一个元素是微服务名，第二个是归属服务ID",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "CheckMode": {
+                  "type": "string",
+                  "description": "校验模式，通常填 ALL（注意首字母大写，后端字段名如此）"
+                },
+                "belongService": {
+                  "type": "string",
+                  "description": "归属服务ID，如 \"203\"（由 overallview micro-service-list 查得）"
+                }
+              },
+              "required": [
+                "dimensionId",
+                "dimensionName",
+                "belongService"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "boolean",
+                  "description": "是否成功；false 表示业务失败"
+                },
+                "message": {
+                  "type": "string",
+                  "description": "提示信息，如「操作成功」"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/bxapi/perf/baseinfo/dimension/multiDel": {
+      "delete": {
+        "summary": "批量删除维度",
+        "description": "破坏性操作（HTTP DELETE + 请求体）：先删掉引用该维度的测量对象，再删维度。注意 dimensionId 是字符串、belongService 是数字，与注册时的类型不完全一致。响应 status=false 表示业务失败。",
+        "tags": [
+          "Perf"
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "query",
+            "required": true,
+            "type": "integer",
+            "description": "工程/任务ID（等同其它接口的 taskId），如 47754"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "dimensionList": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "description": "要删除的维度",
+                    "properties": {
+                      "dimensionId": {
+                        "type": "string",
+                        "description": "维度ID，如 \"56\""
+                      },
+                      "belongService": {
+                        "type": "integer",
+                        "description": "归属服务ID，如 203"
+                      }
+                    },
+                    "required": [
+                      "dimensionId",
+                      "belongService"
+                    ]
+                  },
+                  "description": "要删除的维度列表"
+                }
+              },
+              "required": [
+                "dimensionList"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "boolean",
+                  "description": "是否成功；false 表示业务失败"
+                },
+                "message": {
+                  "type": "string",
+                  "description": "提示信息，如「操作成功」"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/bxapi/perf/class/{belongService}/{mocId}": {
+      "put": {
+        "summary": "注册性能测量对象（perf class）",
+        "description": "新增或修改性能测量对象。调用前要先取到 mocId（resource auto-gen-id --idType moc）与 nmMocId（resource north-auto-gen-id --idType moc），并注册好 dimensionNoList 引用的维度。路径上的 belongService/mocId 必须与请求体中的同名字段一致。注册完对象才能在其上新建指标组（perf indicator-group-add）。未列出的后端字段原样透传。响应 status=false 表示业务失败。",
+        "tags": [
+          "Perf"
+        ],
+        "parameters": [
+          {
+            "name": "belongService",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "description": "归属服务ID，如 203"
+          },
+          {
+            "name": "mocId",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "description": "测量对象ID，由 resource auto-gen-id --idType moc 获取"
+          },
+          {
+            "name": "projectId",
+            "in": "query",
+            "required": true,
+            "type": "integer",
+            "description": "工程/任务ID（等同其它接口的 taskId），如 47754"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "mocId": {
+                  "type": "string",
+                  "description": "测量对象ID，需与路径参数一致"
+                },
+                "mocChName": {
+                  "type": "string",
+                  "description": "测量对象中文名，如「指定RATTYPE的SMF N4局向」"
+                },
+                "belongService": {
+                  "type": "string",
+                  "description": "归属服务ID，如 \"203\"，需与路径参数一致"
+                },
+                "realServicesName": {
+                  "type": "string",
+                  "description": "实际服务列表，多个用逗号分隔，如 SmcExecSvc"
+                },
+                "mocType": {
+                  "type": "integer",
+                  "description": "对象类型，如 3"
+                },
+                "dimensionNoList": {
+                  "type": "string",
+                  "description": "维度编号列表的字符串形式，多个用逗号分隔，如 10005"
+                },
+                "dimensionNoListArray": {
+                  "type": "array",
+                  "description": "维度编号列表的数组形式，如 [10005]，与 dimensionNoList 一致",
+                  "items": {
+                    "type": "integer"
+                  }
+                },
+                "maxMoiNum": {
+                  "type": "string",
+                  "description": "最大实例数，如 4000"
+                },
+                "parentMoc": {
+                  "type": "string",
+                  "description": "父对象，可为 null"
+                },
+                "moiMgrType": {
+                  "type": "integer",
+                  "description": "实例管理方式，如 1"
+                },
+                "stringResId": {
+                  "type": "string",
+                  "description": "语言资源ID，格式 MOC_<测量对象ID>，如 MOC_36"
+                },
+                "monitorId": {
+                  "type": "string",
+                  "description": "监控ID，可为空串"
+                },
+                "nmMocId": {
+                  "type": "string",
+                  "description": "网管测量对象ID，由 resource north-auto-gen-id --idType moc 获取"
+                },
+                "bamMocId": {
+                  "type": "string",
+                  "description": "BAM对象ID，可为空串"
+                },
+                "perfClassMacroDefine": {
+                  "type": "string",
+                  "description": "性能对象宏定义，可为空串"
+                },
+                "objectInstanceName": {
+                  "type": "string",
+                  "description": "对象实例名，可为 null"
+                },
+                "internalCountPara": {
+                  "type": "string",
+                  "description": "内部计数参数，可为 null"
+                },
+                "innerObjRelations": {
+                  "type": "array",
+                  "description": "内部对象关系，通常为空数组",
+                  "items": {
+                    "type": "object"
+                  }
+                },
+                "innerObjListSelected": {
+                  "type": "array",
+                  "description": "已选内部对象，通常为空数组",
+                  "items": {
+                    "type": "object"
+                  }
+                },
+                "microService": {
+                  "type": "array",
+                  "description": "托管微服务，形如 [\"basicBizService\",\"203\"]",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "realServicesNameList": {
+                  "type": "array",
+                  "description": "实际服务列表的数组形式，如 [\"SmcExecSvc\"]",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "CheckMode": {
+                  "type": "string",
+                  "description": "校验模式，通常填 ALL（注意首字母大写，后端字段名如此）"
+                }
+              },
+              "required": [
+                "mocId",
+                "mocChName",
+                "belongService",
+                "stringResId",
+                "nmMocId"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "boolean",
+                  "description": "是否成功；false 表示业务失败"
+                },
+                "message": {
+                  "type": "string",
+                  "description": "提示信息，如「操作成功」"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/bxapi/perf/class/multiDel": {
+      "delete": {
+        "summary": "批量删除性能测量对象（perf class）",
+        "description": "破坏性操作（HTTP DELETE + 请求体）：删除前要先删掉挂在该对象下的指标与指标组，否则会留下残留引用。响应 status=false 表示业务失败。",
+        "tags": [
+          "Perf"
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "query",
+            "required": true,
+            "type": "integer",
+            "description": "工程/任务ID（等同其它接口的 taskId），如 47754"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "perfClassList": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "description": "要删除的测量对象",
+                    "properties": {
+                      "mocId": {
+                        "type": "string",
+                        "description": "测量对象ID，如 \"36\""
+                      },
+                      "belongService": {
+                        "type": "integer",
+                        "description": "归属服务ID，如 203"
+                      },
+                      "nmMocId": {
+                        "type": "integer",
+                        "description": "网管测量对象ID，如 1929445387"
+                      }
+                    },
+                    "required": [
+                      "mocId",
+                      "belongService"
+                    ]
+                  },
+                  "description": "要删除的测量对象列表"
+                }
+              },
+              "required": [
+                "perfClassList"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "boolean",
+                  "description": "是否成功；false 表示业务失败"
+                },
+                "data": {
+                  "type": "string",
+                  "description": "返回数据，通常为空串"
                 }
               }
             }

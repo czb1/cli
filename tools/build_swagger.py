@@ -701,13 +701,17 @@ PERF_RESP = status_resp({"type": "string", "description": "返回数据，通常
                         "提示信息，如「新增成功。」")
 
 # 39. 自动生成本地测量单元ID/指标ID
-add("/api/resource/perf/idRange/autoGenId", "get", "自动生成性能指标ID",
+add("/api/resource/perf/idRange/autoGenId", "get", "自动生成本地测量对象/测量单元/指标ID",
     [query_param("neName", "string", True, "NE名称，如 UNC"),
      query_param("belongService", "integer", True, "归属服务ID，如 203"),
-     query_param("idType", "string", True, "ID类型，metric 或 mu"),
+     query_param("idType", "string", True, "ID类型：mu=测量单元ID，metric=指标ID，moc=测量对象ID"),
      query_param("taskId", "integer", True, "任务ID，如 47754"),
-     query_param("muId", "integer", False, "MU ID，如 9（idType=mu时可留空）")],
-    ["Resource"], responses=AUTOGEN_RESP)
+     query_param("muId", "integer", False, "MU ID，如 9（idType=mu/moc 时可留空）")],
+    ["Resource"],
+    description="按 idType 生成本地ID：moc=测量对象ID（mocId）、mu=测量单元ID（muId）、metric=指标ID（metricId）。"
+                "idType=metric 时必须带 --muId 指明指标挂在哪个测量单元下；moc/mu 可以不带。"
+                "本接口与 northIdRange/autoGenId 是两套ID空间，belongService 也不同，不要混用。",
+    responses=AUTOGEN_RESP)
 
 # 40. 查询全部微服务
 add("/myapi/overallview/getAllMicroService", "get", "查询全部微服务", [], ["OverallView"],
@@ -719,13 +723,13 @@ add("/myapi/overallview/getAllMicroService", "get", "查询全部微服务", [],
 
 # 41. 自动生成网管侧（北向）测量单元ID/指标ID
 add("/api/resource/perf/northIdRange/autoGenId", "get",
-    "自动生成网管侧（北向）测量单元/指标ID",
+    "自动生成网管侧（北向）测量对象/测量单元/指标ID",
     [query_param("neName", "string", True, "NE名称，如 UNC"),
      query_param("belongService", "integer", True, "网管侧归属服务ID，如 114"),
-     query_param("idType", "string", True, "ID类型：mu=网管测量单元ID，metric=网管指标ID"),
+     query_param("idType", "string", True, "ID类型：moc=网管测量对象ID，mu=网管测量单元ID，metric=网管指标ID"),
      query_param("checkDeleted", "boolean", False, "是否复用已删除的ID，默认 false")],
     ["Resource"],
-    description="生成向网管注册时使用的 nmMuId（idType=mu）或 nmMetricId（idType=metric）。"
+    description="生成向网管注册时使用的 nmMocId（idType=moc）、nmMuId（idType=mu）或 nmMetricId（idType=metric）。"
                 "注意 belongService 用的是网管侧服务ID（如 114），与 idRange/autoGenId 的服务ID（如 203）不是同一个。",
     responses=AUTOGEN_RESP)
 
@@ -1225,6 +1229,124 @@ add("/api/task/deleteMany", "post", "批量删除工程/任务",
                 "status=false 表示删除失败。只删一个工程时也可以用 task delete-one。",
     responses=raw_resp({"type": "object", "properties": {
         "status": {"type": "boolean", "description": "是否删除成功"},
+    }}))
+
+
+# ---------------------------------------------------------------------------
+# 维度与性能测量对象（61~64）
+#
+# 注册指标组（测量单元）之前要先有「测量对象」（perf class / MOC）；
+# 测量对象的 dimensionNoList 引用「维度」，所以维度要先于对象注册。
+# 顺序：维度 → 取 mocId / nmMocId → 注册对象 → 注册指标组 → 注册指标。
+# 这几个接口挂在 /bxapi 前缀下，查询参数叫 projectId（值就是 taskId）。
+
+PROJECT_ID_PARAM = query_param("projectId", "integer", True,
+                               "工程/任务ID（等同其它接口的 taskId），如 47754")
+
+# {"message":"操作成功","status":true} 形式
+PERF_CLASS_RESP = raw_resp({"type": "object", "properties": {
+    "status": {"type": "boolean", "description": "是否成功；false 表示业务失败"},
+    "message": {"type": "string", "description": "提示信息，如「操作成功」"},
+}})
+
+# 61. 注册维度
+add("/bxapi/perf/baseinfo/dimension", "post", "注册维度",
+    [PROJECT_ID_PARAM] +
+    body([("dimensionId", "string", "维度ID，全局唯一，如 56"),
+          ("dimensionName", "string", "维度名称，如 5qi"),
+          ("dimensionDataLength", "string", "维度数据长度，如 128"),
+          ("stringResId", "string", "语言资源ID，如 AAA_17；用 perf language-resource-add 登记中英文描述"),
+          ("microService", {"type": "array",
+                            "description": '托管微服务，形如 ["basicBizService","203"]：'
+                                           '第一个元素是微服务名，第二个是归属服务ID',
+                            "items": {"type": "string"}}, "托管微服务"),
+          ("CheckMode", "string", "校验模式，通常填 ALL（注意首字母大写，后端字段名如此）"),
+          ("belongService", "string", "归属服务ID，如 \"203\"（由 overallview micro-service-list 查得）")],
+         ["dimensionId", "dimensionName", "belongService"]),
+    ["Perf"],
+    description="注册一个维度，供测量对象的 dimensionNoList/dimensionNoListArray 引用。"
+                "维度ID要先规划好（不像 mocId/muId 有自动取号接口）。"
+                "请求体里的 belongService 是字符串（如 \"203\"），未列出的后端字段原样透传。"
+                "响应 status=false 表示业务失败。",
+    responses=PERF_CLASS_RESP)
+
+# 62. 批量删除维度（破坏性）
+add("/bxapi/perf/baseinfo/dimension/multiDel", "delete", "批量删除维度",
+    [PROJECT_ID_PARAM] +
+    body([("dimensionList",
+           arr_of(obj([("dimensionId", "string", "维度ID，如 \"56\""),
+                       ("belongService", "integer", "归属服务ID，如 203")],
+                      ["dimensionId", "belongService"], "要删除的维度"),
+                  "要删除的维度列表"),
+           "要删除的维度列表")],
+         ["dimensionList"]),
+    ["Perf"],
+    description="破坏性操作（HTTP DELETE + 请求体）：先删掉引用该维度的测量对象，再删维度。"
+                "注意 dimensionId 是字符串、belongService 是数字，与注册时的类型不完全一致。"
+                "响应 status=false 表示业务失败。",
+    responses=PERF_CLASS_RESP)
+
+# 63. 注册（新增/修改）性能测量对象
+add("/bxapi/perf/class/{belongService}/{mocId}", "put", "注册性能测量对象（perf class）",
+    [path_param("belongService", "integer", "归属服务ID，如 203"),
+     path_param("mocId", "integer", "测量对象ID，由 resource auto-gen-id --idType moc 获取"),
+     PROJECT_ID_PARAM] +
+    body([("mocId", "string", "测量对象ID，需与路径参数一致"),
+          ("mocChName", "string", "测量对象中文名，如「指定RATTYPE的SMF N4局向」"),
+          ("belongService", "string", "归属服务ID，如 \"203\"，需与路径参数一致"),
+          ("realServicesName", "string", "实际服务列表，多个用逗号分隔，如 SmcExecSvc"),
+          ("mocType", "integer", "对象类型，如 3"),
+          ("dimensionNoList", "string", "维度编号列表的字符串形式，多个用逗号分隔，如 10005"),
+          ("dimensionNoListArray", {"type": "array",
+                                    "description": "维度编号列表的数组形式，如 [10005]，与 dimensionNoList 一致",
+                                    "items": {"type": "integer"}}, "维度编号列表"),
+          ("maxMoiNum", "string", "最大实例数，如 4000"),
+          ("parentMoc", "string", "父对象，可为 null"),
+          ("moiMgrType", "integer", "实例管理方式，如 1"),
+          ("stringResId", "string", "语言资源ID，格式 MOC_<测量对象ID>，如 MOC_36"),
+          ("monitorId", "string", "监控ID，可为空串"),
+          ("nmMocId", "string", "网管测量对象ID，由 resource north-auto-gen-id --idType moc 获取"),
+          ("bamMocId", "string", "BAM对象ID，可为空串"),
+          ("perfClassMacroDefine", "string", "性能对象宏定义，可为空串"),
+          ("objectInstanceName", "string", "对象实例名，可为 null"),
+          ("internalCountPara", "string", "内部计数参数，可为 null"),
+          ("innerObjRelations", {"type": "array", "description": "内部对象关系，通常为空数组",
+                                 "items": {"type": "object"}}, "内部对象关系"),
+          ("innerObjListSelected", {"type": "array", "description": "已选内部对象，通常为空数组",
+                                    "items": {"type": "object"}}, "已选内部对象"),
+          ("microService", {"type": "array",
+                            "description": '托管微服务，形如 ["basicBizService","203"]',
+                            "items": {"type": "string"}}, "托管微服务"),
+          ("realServicesNameList", {"type": "array",
+                                    "description": '实际服务列表的数组形式，如 ["SmcExecSvc"]',
+                                    "items": {"type": "string"}}, "实际服务列表"),
+          ("CheckMode", "string", "校验模式，通常填 ALL（注意首字母大写，后端字段名如此）")],
+         ["mocId", "mocChName", "belongService", "stringResId", "nmMocId"]),
+    ["Perf"],
+    description="新增或修改性能测量对象。调用前要先取到 mocId（resource auto-gen-id --idType moc）"
+                "与 nmMocId（resource north-auto-gen-id --idType moc），并注册好 dimensionNoList 引用的维度。"
+                "路径上的 belongService/mocId 必须与请求体中的同名字段一致。"
+                "注册完对象才能在其上新建指标组（perf indicator-group-add）。"
+                "未列出的后端字段原样透传。响应 status=false 表示业务失败。",
+    responses=PERF_CLASS_RESP)
+
+# 64. 批量删除性能测量对象（破坏性）
+add("/bxapi/perf/class/multiDel", "delete", "批量删除性能测量对象（perf class）",
+    [PROJECT_ID_PARAM] +
+    body([("perfClassList",
+           arr_of(obj([("mocId", "string", "测量对象ID，如 \"36\""),
+                       ("belongService", "integer", "归属服务ID，如 203"),
+                       ("nmMocId", "integer", "网管测量对象ID，如 1929445387")],
+                      ["mocId", "belongService"], "要删除的测量对象"),
+                  "要删除的测量对象列表"),
+           "要删除的测量对象列表")],
+         ["perfClassList"]),
+    ["Perf"],
+    description="破坏性操作（HTTP DELETE + 请求体）：删除前要先删掉挂在该对象下的指标与指标组，"
+                "否则会留下残留引用。响应 status=false 表示业务失败。",
+    responses=raw_resp({"type": "object", "properties": {
+        "status": {"type": "boolean", "description": "是否成功；false 表示业务失败"},
+        "data": {"type": "string", "description": "返回数据，通常为空串"},
     }}))
 
 

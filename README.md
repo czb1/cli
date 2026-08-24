@@ -8,7 +8,7 @@
 - **AI 可探索**：`--help`（分层）+ `describe`（完整语义契约）。
 - **零业务逻辑**：CLI 仅作 HTTP 客户端，调用 `https://omtool.rnd.huawei.com`。
 
-覆盖接口文档中全部 **60** 个接口。
+覆盖接口文档中全部 **64** 个接口。
 
 ## 构建
 
@@ -60,7 +60,7 @@ Windows 上安装后需**重开终端**，`setx` 对已打开的窗口不生效�
 ./omres-cli raw /api/some/newEndpoint -X POST --body '{}'
 ```
 
-### 命令分组（60 接口）
+### 命令分组（64 接口）
 
 | group | actions |
 |-------|---------|
@@ -82,7 +82,7 @@ Windows 上安装后需**重开终端**，`setx` 对已打开的窗口不生效�
 | info-module | query-all |
 | overallview | search, micro-service-list |
 | resource | auto-gen-id, north-auto-gen-id |
-| perf | indicator-group-add, indicator-add, indicator-update, language-resource-add, language-resource-delete ⚠, indicator-delete ⚠, indicator-group-delete ⚠ |
+| perf | dimension-add, object-add, indicator-group-add, indicator-add, indicator-update, language-resource-add, language-resource-delete ⚠, indicator-delete ⚠, indicator-group-delete ⚠, object-delete ⚠, dimension-delete ⚠ |
 | alarm-service | upsert, list |
 | alarm | upsert, list |
 | alarm-enum | upsert, list |
@@ -120,9 +120,76 @@ CLI 只提供原子命令，**不做编排**——下面每一步的入参需要
 > 但要传的是告警的**内部主键 `id`**（第 4 步响应里的 `id`，如 `96`），
 > 不是后端分配的告警号字符串（如 `"100910"`）。`alarmInternalId` 同理。
 
+### 维度与测量对象注册（perf dimension-add / object-add）
+
+指标组（测量单元）必须挂在一个**性能测量对象**（perf class）下，而测量对象的维度列表
+引用的是先注册好的**维度**，所以完整链路是：
+
+```
+维度 → 测量对象 → 指标组（测量单元）→ 指标
+```
+
+这四个接口挂在 `/bxapi` 前缀下，查询参数叫 `--projectId`（值就是 `taskId`，与其它接口的 `--taskId` 同一个值）。
+
+```bash
+# 1) 注册维度（维度ID要自己规划，没有自动取号接口）
+omres-cli perf dimension-add --projectId 47754 \
+  --body '{"dimensionId":"56","dimensionName":"5qi","dimensionDataLength":"128","stringResId":"AAA_17","microService":["basicBizService","203"],"CheckMode":"ALL","belongService":"203"}'
+# → {"status":true,"message":"操作成功"}
+
+# 2) 取测量对象ID（mocId）：idType=moc，muId 留空
+omres-cli resource auto-gen-id --neName UNC --belongService 203 --idType moc --taskId 47754
+# → {"status":true,"data":36}
+
+# 3) 取网管测量对象ID（nmMocId）；注意 belongService 用网管侧服务ID
+omres-cli resource north-auto-gen-id --neName UNC --belongService 114 --idType moc --checkDeleted false
+# → {"status":true,"data":1929445387}
+
+# 4) 注册测量对象：路径参数依次是 belongService 和 mocId
+omres-cli perf object-add 203 36 --projectId 47754 --body-file ./moc.json
+# → {"status":true,"message":"操作成功"}
+```
+
+`./moc.json` 形如：
+
+```json
+{
+  "mocId": "36",
+  "mocChName": "指定RATTYPE的SMF N4局向",
+  "belongService": "203",
+  "realServicesName": "SmcExecSvc",
+  "mocType": 3,
+  "dimensionNoList": "10005",
+  "dimensionNoListArray": [10005],
+  "maxMoiNum": "4000",
+  "parentMoc": null,
+  "moiMgrType": 1,
+  "stringResId": "MOC_36",
+  "monitorId": "",
+  "nmMocId": "1929445387",
+  "bamMocId": "",
+  "perfClassMacroDefine": "",
+  "objectInstanceName": null,
+  "internalCountPara": null,
+  "innerObjRelations": [],
+  "innerObjListSelected": [],
+  "microService": ["basicBizService", "203"],
+  "realServicesNameList": ["SmcExecSvc"],
+  "CheckMode": "ALL"
+}
+```
+
+- 路径上的 `belongService`/`mocId` 必须与请求体里的同名字段一致，否则后端按路径为准会写错记录。
+- `dimensionNoList`（逗号分隔字符串）与 `dimensionNoListArray`（数组）要保持一致，
+  引用的维度须先用 `dimension-add` 注册。
+- `stringResId` 用 `MOC_<mocId>`、维度用自己的资源ID（如 `AAA_17`），中英文描述同样靠
+  `perf language-resource-add` 补，否则前端/网管上看不到描述。
+- `object-add` 是 PUT，新增与修改同一个接口：改配置时把完整记录再传一次即可。
+
 ### 性能指标注册流程（perf / resource / overallview）
 
-新增一个指标组（测量单元）和其下的指标，接口有严格先后顺序：前一步拿到的 ID 是后一步的入参。
+测量对象就绪后，再新增指标组（测量单元）和其下的指标，接口同样有严格先后顺序：
+前一步拿到的 ID 是后一步的入参。
 以「指定RATTYPE的CGW发送 PDU Session Establishment Reject消息数」为例：
 
 ```bash
@@ -169,7 +236,8 @@ omres-cli perf language-resource-add --taskId 47754 \
 - 除第 1 步（`overallview micro-service-list`）和第 3/7 步（网管北向取号）外，其余每一步都要带 `--taskId`，
   值取自第 0 步 `task create` 响应的 `extendData`。
 - `resource auto-gen-id` 与 `resource north-auto-gen-id` 是两套 ID 空间：前者是本地（`belongService` 如 203），
-  后者是网管北向（`belongService` 如 114），不要混用。
+  后者是网管北向（`belongService` 如 114），不要混用。两者的 `--idType` 都支持
+  `moc`（测量对象）/ `mu`（测量单元）/ `metric`（指标）；只有 `--idType metric` 需要额外带 `--muId`。
 - `indicator-update` 的查询参数 `--metricId` 必须与请求体里的 `metricId` 一致。
 - 这几个接口都以 `{"status":false}` 表达业务失败，CLI 会把它转成 `Operation Failed` 错误，不会当成成功。
 - 请求体字段较多，建议用 `--body-file`；未在 swagger 中列出的后端字段会原样透传，不做裁剪。
@@ -189,7 +257,15 @@ omres-cli perf indicator-delete --taskId 47754 --body-file ./metric-delete.json 
 # 2) 再删指标组（测量单元）
 omres-cli perf indicator-group-delete --taskId 47754 --body-file ./mu-delete.json --yes
 
-# 3) 最后删语言资源
+# 3) 再删测量对象（对象下还挂着指标组时会留下残留引用）
+omres-cli perf object-delete --projectId 47754 \
+  --body '{"perfClassList":[{"mocId":"36","belongService":203,"nmMocId":1929445387}]}' --yes
+
+# 4) 然后删维度（还有对象引用该维度时删不干净）
+omres-cli perf dimension-delete --projectId 47754 \
+  --body '{"dimensionList":[{"dimensionId":"56","belongService":203}]}' --yes
+
+# 5) 最后删语言资源
 omres-cli perf language-resource-delete --taskId 47754 \
   --body '[{"stringResId":"MU_55","descriptionZh":"指定RATTYPE的CGW 4G会话管理失败流程","descriptionEn":"Failed CGW 4G session management procedures for a specific RAT type","remark":null,"belongService":203}]' --yes
 
@@ -200,6 +276,8 @@ omres-cli task delete-many --body '{"idList":[48314]}' --yes
 - 删除指标组/指标的响应 `data` 里那几个 `*Global` 数组，列的是被牵连的全局配置，
   为空表示没有残留引用；`data.length` 是实际删除条数。
 - 数组请求体的字段清单同样可以用 `describe` 查：`omres-cli describe perf indicator-delete`。
+- `object-delete` / `dimension-delete` 是 HTTP `DELETE` **带请求体**，请求体不是裸数组，
+  而是 `{"perfClassList":[...]}` / `{"dimensionList":[...]}`，别和上面几个数组请求体搞混。
 
 ## 破坏性操作
 
