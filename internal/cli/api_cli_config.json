@@ -44,6 +44,17 @@
         },
         {
           "http": {
+            "path": "/api/autoGit/importInfoFormGit",
+            "method": "POST"
+          },
+          "cli": {
+            "action": "import-git",
+            "description": "使用 Git 仓库导入 5G 建模模型到已有工程",
+            "example": "omres-cli task import-git --body '{\"gitForm\":{\"repositoryUrl\":\"ssh://git@code.example.com:2222/group/project.git\",\"branchName\":\"refs/heads/main\",\"microService\":\"ompublic\",\"importTags\":\"perf\",\"importModuleTreeJson\":\"[]\"},\"taskId\":12345,\"taskName\":\"demo\"}'"
+          }
+        },
+        {
+          "http": {
             "path": "/sbbapi/task/exportStruct/{taskId}/{taskName}/{version}",
             "method": "POST"
           },
