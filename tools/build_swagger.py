@@ -1349,6 +1349,29 @@ add("/bxapi/perf/class/multiDel", "delete", "批量删除性能测量对象（pe
         "data": {"type": "string", "description": "返回数据，通常为空串"},
     }}))
 
+# 65. 使用 Git 仓库导入 5G 建模模型
+git_form = obj([
+    ("repositoryUrl", "string", "Git 仓库 SSH 地址，如 ssh://git@host:2222/group/project.git"),
+    ("branchName", "string", "要导入的分支完整引用，如 refs/heads/main"),
+    ("microService", "string", "导入到的微服务名称，如 ompublic"),
+    ("importTags", "string", "导入的模型标签，如 perf"),
+    ("importModuleTreeJson", "string", "模块树 JSON 字符串；不限制模块时传 []"),
+], required=["repositoryUrl", "branchName", "microService", "importTags", "importModuleTreeJson"],
+    desc="Git 导入配置")
+add("/api/autoGit/importInfoFormGit", "post", "使用 Git 导入 5G 建模模型",
+    body([("gitForm", git_form, "Git 仓库与导入范围配置"),
+          ("taskId", "integer", "目标工程/任务 ID"),
+          ("taskName", "string", "目标工程/任务名称")],
+         ["gitForm", "taskId", "taskName"]),
+    ["Task"],
+    description="从指定 Git 仓库和分支读取模型，并导入到已有工程。"
+                "branchName 使用 refs/heads/... 形式；importModuleTreeJson 是 JSON 字符串，不是数组。"
+                "响应 status=false 表示业务失败。",
+    responses=raw_resp({"type": "object", "properties": {
+        "status": {"type": "boolean", "description": "是否导入成功；false 表示业务失败"},
+        "message": {"type": "string", "description": "导入结果提示，如「导入成功」"},
+    }}))
+
 
 swagger = {
     "swagger": "2.0",

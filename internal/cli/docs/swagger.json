@@ -5795,6 +5795,91 @@
           }
         }
       }
+    },
+    "/api/autoGit/importInfoFormGit": {
+      "post": {
+        "summary": "使用 Git 导入 5G 建模模型",
+        "description": "从指定 Git 仓库和分支读取模型，并导入到已有工程。branchName 使用 refs/heads/... 形式；importModuleTreeJson 是 JSON 字符串，不是数组。响应 status=false 表示业务失败。",
+        "tags": [
+          "Task"
+        ],
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "gitForm": {
+                  "type": "object",
+                  "description": "Git 导入配置",
+                  "properties": {
+                    "repositoryUrl": {
+                      "type": "string",
+                      "description": "Git 仓库 SSH 地址，如 ssh://git@host:2222/group/project.git"
+                    },
+                    "branchName": {
+                      "type": "string",
+                      "description": "要导入的分支完整引用，如 refs/heads/main"
+                    },
+                    "microService": {
+                      "type": "string",
+                      "description": "导入到的微服务名称，如 ompublic"
+                    },
+                    "importTags": {
+                      "type": "string",
+                      "description": "导入的模型标签，如 perf"
+                    },
+                    "importModuleTreeJson": {
+                      "type": "string",
+                      "description": "模块树 JSON 字符串；不限制模块时传 []"
+                    }
+                  },
+                  "required": [
+                    "repositoryUrl",
+                    "branchName",
+                    "microService",
+                    "importTags",
+                    "importModuleTreeJson"
+                  ]
+                },
+                "taskId": {
+                  "type": "integer",
+                  "description": "目标工程/任务 ID"
+                },
+                "taskName": {
+                  "type": "string",
+                  "description": "目标工程/任务名称"
+                }
+              },
+              "required": [
+                "gitForm",
+                "taskId",
+                "taskName"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "boolean",
+                  "description": "是否导入成功；false 表示业务失败"
+                },
+                "message": {
+                  "type": "string",
+                  "description": "导入结果提示，如「导入成功」"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   }
 }

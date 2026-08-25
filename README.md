@@ -8,7 +8,7 @@
 - **AI 可探索**：`--help`（分层）+ `describe`（完整语义契约）。
 - **零业务逻辑**：CLI 仅作 HTTP 客户端，调用 `https://omtool.rnd.huawei.com`。
 
-覆盖接口文档中全部 **64** 个接口。
+覆盖接口文档中全部 **65** 个接口。
 
 ## 构建
 
@@ -53,6 +53,9 @@ Windows 上安装后需**重开终端**，`setx` 对已打开的窗口不生效�
 # 文件上传（multipart）
 ./omres-cli upload file --taskId 123 --file ./model.zip
 
+# 使用 Git 仓库导入 5G 建模模型
+./omres-cli task import-git --body '{"gitForm":{"repositoryUrl":"ssh://git@code.example.com:2222/group/project.git","branchName":"refs/heads/main","microService":"ompublic","importTags":"perf","importModuleTreeJson":"[]"},"taskId":12345,"taskName":"demo"}'
+
 # 从文件读 body
 ./omres-cli mml-command upsert --body-file ./cmd.json
 
@@ -60,12 +63,12 @@ Windows 上安装后需**重开终端**，`setx` 对已打开的窗口不生效�
 ./omres-cli raw /api/some/newEndpoint -X POST --body '{}'
 ```
 
-### 命令分组（64 接口）
+### 命令分组（65 接口）
 
 | group | actions |
 |-------|---------|
 | auth | login, status, logout |
-| task | create, export-struct, export-result, download, export-validate, include-alarm, delete-one ⚠, delete-many ⚠ |
+| task | create, import-git, export-struct, export-result, download, export-validate, include-alarm, delete-one ⚠, delete-many ⚠ |
 | upload | file, parse-xml |
 | moc | add-name, select-name, insert-info, generate-script |
 | moc-field | add-name, select-name, update-info |
