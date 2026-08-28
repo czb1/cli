@@ -5796,6 +5796,265 @@
         }
       }
     },
+    "/api/autoGit/getMicroServices": {
+      "get": {
+        "summary": "拉取 Git 分支并返回微服务列表",
+        "description": "服务端拉取指定 Git 分支，并返回仓库中可供选择的微服务目录。",
+        "tags": [
+          "Task"
+        ],
+        "parameters": [
+          {
+            "name": "repositoryUrl",
+            "in": "query",
+            "required": true,
+            "type": "string",
+            "description": "Git 仓库 SSH 地址"
+          },
+          {
+            "name": "branchName",
+            "in": "query",
+            "required": true,
+            "type": "string",
+            "description": "分支完整引用，如 refs/heads/main"
+          },
+          {
+            "name": "taskId",
+            "in": "query",
+            "required": true,
+            "type": "integer",
+            "description": "目标工程/任务 ID"
+          },
+          {
+            "name": "taskName",
+            "in": "query",
+            "required": true,
+            "type": "string",
+            "description": "目标工程/任务名称"
+          },
+          {
+            "name": "resolveConflict",
+            "in": "query",
+            "required": true,
+            "type": "integer",
+            "description": "是否解决冲突；不解决传 0"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "boolean",
+                  "description": "是否成功；false 表示业务失败"
+                },
+                "data": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "可选微服务列表"
+                },
+                "message": {
+                  "type": "string",
+                  "description": "查询结果提示"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/autoGit/autoDisplayResource": {
+      "post": {
+        "summary": "选择微服务并返回资源类型",
+        "tags": [
+          "Task"
+        ],
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "microService": {
+                  "type": "string",
+                  "description": "微服务名称，如 ompublic"
+                },
+                "taskId": {
+                  "type": "integer",
+                  "description": "目标工程/任务 ID"
+                },
+                "taskName": {
+                  "type": "string",
+                  "description": "目标工程/任务名称"
+                }
+              },
+              "required": [
+                "microService",
+                "taskId",
+                "taskName"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "boolean",
+                  "description": "是否成功；false 表示业务失败"
+                },
+                "data": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "可导入资源类型列表"
+                },
+                "message": {
+                  "type": "string",
+                  "description": "查询结果提示"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/myapi/upload/isEmptyProject": {
+      "post": {
+        "summary": "判断工程是否为空",
+        "description": "Git 模型导入前置校验。响应 status 表示校验是否通过。",
+        "tags": [
+          "Task"
+        ],
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "taskId": {
+                  "type": "integer",
+                  "description": "目标工程/任务 ID"
+                }
+              },
+              "required": [
+                "taskId"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "boolean",
+                  "description": "校验是否通过；false 表示业务失败"
+                },
+                "message": {
+                  "type": "string",
+                  "description": "校验结果提示"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/autoGit/blacklistJudge": {
+      "post": {
+        "summary": "Git 模型黑名单校验",
+        "description": "模型导入前检查所选仓库、分支、微服务及资源类型是否命中黑名单。",
+        "tags": [
+          "Task"
+        ],
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "gitForm": {
+                  "type": "object",
+                  "description": "Git 导入配置",
+                  "properties": {
+                    "repositoryUrl": {
+                      "type": "string",
+                      "description": "Git 仓库 SSH 地址，如 ssh://git@host:2222/group/project.git"
+                    },
+                    "branchName": {
+                      "type": "string",
+                      "description": "要导入的分支完整引用，如 refs/heads/main"
+                    },
+                    "microService": {
+                      "type": "string",
+                      "description": "导入到的微服务名称，如 ompublic"
+                    },
+                    "importTags": {
+                      "type": "string",
+                      "description": "导入的模型标签，如 perf"
+                    },
+                    "importModuleTreeJson": {
+                      "type": "string",
+                      "description": "模块树 JSON 字符串；不限制模块时传 []"
+                    }
+                  },
+                  "required": [
+                    "repositoryUrl",
+                    "branchName",
+                    "microService",
+                    "importTags",
+                    "importModuleTreeJson"
+                  ]
+                },
+                "taskId": {
+                  "type": "integer",
+                  "description": "目标工程/任务 ID"
+                }
+              },
+              "required": [
+                "gitForm",
+                "taskId"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "boolean",
+                  "description": "校验是否通过；false 表示业务失败"
+                },
+                "message": {
+                  "type": "string",
+                  "description": "校验结果提示"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/autoGit/importInfoFormGit": {
       "post": {
         "summary": "使用 Git 导入 5G 建模模型",

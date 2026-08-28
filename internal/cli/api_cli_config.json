@@ -44,6 +44,50 @@
         },
         {
           "http": {
+            "path": "/api/autoGit/getMicroServices",
+            "method": "GET"
+          },
+          "cli": {
+            "action": "pull-branch",
+            "description": "拉取 Git 分支并返回可选微服务列表",
+            "example": "omres-cli task pull-branch --repositoryUrl 'ssh://git@code.example.com:2222/group/project.git' --branchName refs/heads/main --taskId 12345 --taskName demo --resolveConflict 0"
+          }
+        },
+        {
+          "http": {
+            "path": "/api/autoGit/autoDisplayResource",
+            "method": "POST"
+          },
+          "cli": {
+            "action": "resource-types",
+            "description": "选择微服务并返回可导入的资源类型",
+            "example": "omres-cli task resource-types --body '{\"microService\":\"ompublic\",\"taskId\":12345,\"taskName\":\"demo\"}'"
+          }
+        },
+        {
+          "http": {
+            "path": "/myapi/upload/isEmptyProject",
+            "method": "POST"
+          },
+          "cli": {
+            "action": "is-empty",
+            "description": "判断工程是否为空",
+            "example": "omres-cli task is-empty --body '{\"taskId\":12345}'"
+          }
+        },
+        {
+          "http": {
+            "path": "/api/autoGit/blacklistJudge",
+            "method": "POST"
+          },
+          "cli": {
+            "action": "blacklist-check",
+            "description": "导入前执行 Git 模型黑名单校验",
+            "example": "omres-cli task blacklist-check --body '{\"gitForm\":{\"repositoryUrl\":\"ssh://git@code.example.com:2222/group/project.git\",\"branchName\":\"refs/heads/main\",\"microService\":\"ompublic\",\"importTags\":\"perf\",\"importModuleTreeJson\":\"[]\"},\"taskId\":12345}'"
+          }
+        },
+        {
+          "http": {
             "path": "/api/autoGit/importInfoFormGit",
             "method": "POST"
           },

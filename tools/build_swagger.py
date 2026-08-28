@@ -17,7 +17,7 @@ import json
 import os
 
 STRIP_PREFIX = os.environ.get("STRIP_PREFIX", "0") == "1"
-PREFIXES = ("/api", "/sbbapi", "/list", "/longtime")
+PREFIXES = ("/api", "/sbbapi", "/list", "/longtime", "/myapi")
 
 
 def path_of(p):
@@ -1349,7 +1349,41 @@ add("/bxapi/perf/class/multiDel", "delete", "批量删除性能测量对象（pe
         "data": {"type": "string", "description": "返回数据，通常为空串"},
     }}))
 
-# 65. 使用 Git 仓库导入 5G 建模模型
+# 65. 拉取 Git 分支并列出微服务
+add("/api/autoGit/getMicroServices", "get", "拉取 Git 分支并返回微服务列表",
+    [query_param("repositoryUrl", "string", True, "Git 仓库 SSH 地址"),
+     query_param("branchName", "string", True, "分支完整引用，如 refs/heads/main"),
+     query_param("taskId", "integer", True, "目标工程/任务 ID"),
+     query_param("taskName", "string", True, "目标工程/任务名称"),
+     query_param("resolveConflict", "integer", True, "是否解决冲突；不解决传 0")],
+    ["Task"],
+    description="服务端拉取指定 Git 分支，并返回仓库中可供选择的微服务目录。",
+    responses=status_resp(
+        {"type": "array", "items": {"type": "string"}, "description": "可选微服务列表"},
+        "查询结果提示"))
+
+# 66. 选择微服务并列出资源类型
+add("/api/autoGit/autoDisplayResource", "post", "选择微服务并返回资源类型",
+    body([("microService", "string", "微服务名称，如 ompublic"),
+          ("taskId", "integer", "目标工程/任务 ID"),
+          ("taskName", "string", "目标工程/任务名称")],
+         ["microService", "taskId", "taskName"]),
+    ["Task"],
+    responses=status_resp(
+        {"type": "array", "items": {"type": "string"}, "description": "可导入资源类型列表"},
+        "查询结果提示"))
+
+# 67. 判断工程是否为空
+add("/myapi/upload/isEmptyProject", "post", "判断工程是否为空",
+    body([("taskId", "integer", "目标工程/任务 ID")], ["taskId"]),
+    ["Task"],
+    description="Git 模型导入前置校验。响应 status 表示校验是否通过。",
+    responses=raw_resp({"type": "object", "properties": {
+        "status": {"type": "boolean", "description": "校验是否通过；false 表示业务失败"},
+        "message": {"type": "string", "description": "校验结果提示"},
+    }}))
+
+# 68. Git 模型黑名单校验
 git_form = obj([
     ("repositoryUrl", "string", "Git 仓库 SSH 地址，如 ssh://git@host:2222/group/project.git"),
     ("branchName", "string", "要导入的分支完整引用，如 refs/heads/main"),
@@ -1358,6 +1392,18 @@ git_form = obj([
     ("importModuleTreeJson", "string", "模块树 JSON 字符串；不限制模块时传 []"),
 ], required=["repositoryUrl", "branchName", "microService", "importTags", "importModuleTreeJson"],
     desc="Git 导入配置")
+add("/api/autoGit/blacklistJudge", "post", "Git 模型黑名单校验",
+    body([("gitForm", git_form, "Git 仓库与导入范围配置"),
+          ("taskId", "integer", "目标工程/任务 ID")],
+         ["gitForm", "taskId"]),
+    ["Task"],
+    description="模型导入前检查所选仓库、分支、微服务及资源类型是否命中黑名单。",
+    responses=raw_resp({"type": "object", "properties": {
+        "status": {"type": "boolean", "description": "校验是否通过；false 表示业务失败"},
+        "message": {"type": "string", "description": "校验结果提示"},
+    }}))
+
+# 69. 使用 Git 仓库导入 5G 建模模型
 add("/api/autoGit/importInfoFormGit", "post", "使用 Git 导入 5G 建模模型",
     body([("gitForm", git_form, "Git 仓库与导入范围配置"),
           ("taskId", "integer", "目标工程/任务 ID"),
