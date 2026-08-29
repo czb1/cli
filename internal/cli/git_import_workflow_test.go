@@ -103,22 +103,22 @@ func TestGitImportWorkflowRequests(t *testing.T) {
 	}{
 		{
 			name: "pull-branch", method: http.MethodGet, path: "/api/autoGit/getMicroServices",
-			args: []string{"task", "pull-branch", "--repositoryUrl", "ssh://git@example.com:2222/5gcore/cp/lib/omres.git", "--branchName", "refs/heads/personal/user/e2e040827", "--taskId", "48818", "--taskName", "percreate", "--resolveConflict", "0"},
+			args:      []string{"task", "pull-branch", "--repositoryUrl", "ssh://git@example.com:2222/5gcore/cp/lib/omres.git", "--branchName", "refs/heads/personal/user/e2e040827", "--taskId", "48818", "--taskName", "percreate", "--resolveConflict", "0"},
 			wantQuery: url.Values{"repositoryUrl": {"ssh://git@example.com:2222/5gcore/cp/lib/omres.git"}, "branchName": {"refs/heads/personal/user/e2e040827"}, "taskId": {"48818"}, "taskName": {"percreate"}, "resolveConflict": {"0"}},
 		},
 		{
 			name: "resource-types", method: http.MethodPost, path: "/api/autoGit/autoDisplayResource",
-			args: []string{"task", "resource-types", "--body", `{"microService":"ompublic","taskId":48818,"taskName":"percreate"}`},
+			args:     []string{"task", "resource-types", "--body", `{"microService":"ompublic","taskId":48818,"taskName":"percreate"}`},
 			wantBody: `{"microService":"ompublic","taskId":48818,"taskName":"percreate"}`,
 		},
 		{
 			name: "is-empty", method: http.MethodPost, path: "/myapi/upload/isEmptyProject",
-			args: []string{"task", "is-empty", "--body", `{"taskId":48818}`},
+			args:     []string{"task", "is-empty", "--body", `{"taskId":48818}`},
 			wantBody: `{"taskId":48818}`,
 		},
 		{
 			name: "blacklist-check", method: http.MethodPost, path: "/api/autoGit/blacklistJudge",
-			args: []string{"task", "blacklist-check", "--body", `{"gitForm":` + gitForm + `,"taskId":48818}`},
+			args:     []string{"task", "blacklist-check", "--body", `{"gitForm":` + gitForm + `,"taskId":48818}`},
 			wantBody: `{"gitForm":` + gitForm + `,"taskId":48818}`,
 		},
 	}
@@ -167,7 +167,7 @@ func TestGitImportWorkflowRequests(t *testing.T) {
 			if got.method != tt.method || got.path != tt.path {
 				t.Fatalf("request = %s %s, want %s %s", got.method, got.path, tt.method, tt.path)
 			}
-			if !reflect.DeepEqual(got.query, tt.wantQuery) {
+			if got.query.Encode() != tt.wantQuery.Encode() {
 				t.Errorf("query = %v, want %v", got.query, tt.wantQuery)
 			}
 			if tt.wantBody == "" {

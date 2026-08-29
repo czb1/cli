@@ -67,7 +67,7 @@ func TestUDGExportRequests(t *testing.T) {
 	}{
 		{
 			name: "create-git-commit", method: http.MethodPost, path: "/api/udgExport/",
-			args: []string{"task", "create-git-commit", "--taskId", "48861", "--body", payload},
+			args:     []string{"task", "create-git-commit", "--taskId", "48861", "--body", payload},
 			wantBody: payload,
 		},
 		{
