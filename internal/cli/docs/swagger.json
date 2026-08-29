@@ -5799,7 +5799,7 @@
     "/api/autoGit/getMicroServices": {
       "get": {
         "summary": "拉取 Git 分支并返回微服务列表",
-        "description": "服务端拉取指定 Git 分支，并返回仓库中可供选择的微服务目录。",
+        "description": "服务端拉取指定 Git 分支，并返回仓库中可供选择的微服务目录。repositoryUrl 支持以分号连接多个仓库地址。",
         "tags": [
           "Task"
         ],
@@ -5809,7 +5809,7 @@
             "in": "query",
             "required": true,
             "type": "string",
-            "description": "Git 仓库 SSH 地址"
+            "description": "Git 仓库 SSH 地址；多个仓库以分号分隔"
           },
           {
             "name": "branchName",
@@ -5996,7 +5996,7 @@
                   "properties": {
                     "repositoryUrl": {
                       "type": "string",
-                      "description": "Git 仓库 SSH 地址，如 ssh://git@host:2222/group/project.git"
+                      "description": "Git 仓库 SSH 地址；多个仓库以分号分隔"
                     },
                     "branchName": {
                       "type": "string",
@@ -6076,7 +6076,7 @@
                   "properties": {
                     "repositoryUrl": {
                       "type": "string",
-                      "description": "Git 仓库 SSH 地址，如 ssh://git@host:2222/group/project.git"
+                      "description": "Git 仓库 SSH 地址；多个仓库以分号分隔"
                     },
                     "branchName": {
                       "type": "string",
@@ -6133,6 +6133,220 @@
                 "message": {
                   "type": "string",
                   "description": "导入结果提示，如「导入成功」"
+                },
+                "errorMessage": {
+                  "type": "string",
+                  "description": "导入失败的详细原因"
+                },
+                "step": {
+                  "type": "string",
+                  "description": "导入执行步骤或失败步骤，如 error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/udgExport/": {
+      "post": {
+        "summary": "创建 UDG Git 提交",
+        "description": "根据工程中的建模数据创建 Git 提交，并启动 Pipeline-X 异步任务。响应中的 jobId 可用于在 Pipeline-X 查看任务；后续使用 git-commit-status 查询完成状态。",
+        "tags": [
+          "Task"
+        ],
+        "parameters": [
+          {
+            "name": "taskId",
+            "in": "query",
+            "required": true,
+            "type": "integer",
+            "description": "目标工程/任务 ID"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "task_name": {
+                  "type": "string",
+                  "description": "工程/任务名称"
+                },
+                "branch": {
+                  "type": "string",
+                  "description": "提交目标分支，不带 refs/heads/ 前缀"
+                },
+                "w3_account": {
+                  "type": "string",
+                  "description": "提交人的 W3 账号"
+                },
+                "ms_list": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": ""
+                },
+                "repo_list": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": ""
+                },
+                "task_types": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": ""
+                },
+                "change_obj_list": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "description": "",
+                    "properties": {}
+                  },
+                  "description": ""
+                },
+                "ne_type": {
+                  "type": "string",
+                  "description": "网元类型，如 UDG"
+                },
+                "commit_msg": {
+                  "type": "string",
+                  "description": "Git 提交说明"
+                }
+              },
+              "required": [
+                "task_name",
+                "branch",
+                "w3_account",
+                "ms_list",
+                "repo_list",
+                "task_types",
+                "change_obj_list",
+                "ne_type",
+                "commit_msg"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "boolean",
+                  "description": "是否成功启动异步任务"
+                },
+                "data": {
+                  "type": "object",
+                  "properties": {
+                    "jobId": {
+                      "type": "string",
+                      "description": "Pipeline-X 任务 ID"
+                    },
+                    "url": {
+                      "type": "string",
+                      "description": "Pipeline-X 任务页面"
+                    }
+                  }
+                },
+                "message": {
+                  "type": "string",
+                  "description": "执行结果提示"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/udgExport/queryUdgExportTask/": {
+      "get": {
+        "summary": "查询 UDG Git 提交状态",
+        "description": "查询创建 Git 提交的 Pipeline-X 异步任务。pxStatus 为「运行中」时继续轮询；为「已完成」时 resultLink 提供结果压缩包地址。",
+        "tags": [
+          "Task"
+        ],
+        "parameters": [
+          {
+            "name": "taskId",
+            "in": "query",
+            "required": true,
+            "type": "integer",
+            "description": "目标工程/任务 ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "boolean",
+                  "description": "是否成功；false 表示业务失败"
+                },
+                "data": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "description": "UDG Git 提交任务",
+                    "properties": {
+                      "id": {
+                        "type": "integer",
+                        "description": "记录 ID"
+                      },
+                      "taskId": {
+                        "type": "integer",
+                        "description": "工程/任务 ID"
+                      },
+                      "taskTypes": {
+                        "type": "string",
+                        "description": "以分号分隔的任务类型"
+                      },
+                      "pxLink": {
+                        "type": "string",
+                        "description": "Pipeline-X 任务页面"
+                      },
+                      "pxJobId": {
+                        "type": "string",
+                        "description": "Pipeline-X 任务 ID"
+                      },
+                      "pxStatus": {
+                        "type": "string",
+                        "description": "任务状态，如运行中、已完成"
+                      },
+                      "resultLink": {
+                        "type": "string",
+                        "description": "完成后的结果压缩包地址，可为 null"
+                      },
+                      "createTime": {
+                        "type": "string",
+                        "description": "任务创建时间"
+                      },
+                      "stepIndex": {
+                        "type": "integer",
+                        "description": "当前步骤序号"
+                      },
+                      "stepStatus": {
+                        "type": "string",
+                        "description": "当前步骤状态"
+                      }
+                    }
+                  },
+                  "description": ""
+                },
+                "message": {
+                  "type": "string",
+                  "description": "查询结果提示"
                 }
               }
             }

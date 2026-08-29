@@ -99,6 +99,28 @@
         },
         {
           "http": {
+            "path": "/api/udgExport/",
+            "method": "POST"
+          },
+          "cli": {
+            "action": "create-git-commit",
+            "description": "创建 UDG Git 提交并启动 Pipeline-X 异步任务",
+            "example": "omres-cli task create-git-commit --taskId 48861 --body '{\"task_name\":\"e2emml\",\"branch\":\"personal/z00942561/mml824\",\"w3_account\":\"z00942561\",\"ms_list\":[\"DGW_NLS\"],\"repo_list\":[\"pf\",\"om\"],\"task_types\":[\"cfg_model\",\"head\",\"doc\",\"enum_head\",\"alpha_xml\",\"excel\"],\"change_obj_list\":[],\"ne_type\":\"UDG\",\"commit_msg\":\"第一次提交\"}'"
+          }
+        },
+        {
+          "http": {
+            "path": "/api/udgExport/queryUdgExportTask/",
+            "method": "GET"
+          },
+          "cli": {
+            "action": "git-commit-status",
+            "description": "查询 UDG Git 提交异步任务状态及结果链接",
+            "example": "omres-cli task git-commit-status --taskId 48861"
+          }
+        },
+        {
+          "http": {
             "path": "/sbbapi/task/exportStruct/{taskId}/{taskName}/{version}",
             "method": "POST"
           },

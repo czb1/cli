@@ -8,7 +8,7 @@
 - **AI 可探索**：`--help`（分层）+ `describe`（完整语义契约）。
 - **零业务逻辑**：CLI 仅作 HTTP 客户端，调用 `https://omtool.rnd.huawei.com`。
 
-覆盖接口文档中全部 **69** 个接口。
+覆盖接口文档中全部 **71** 个接口。
 
 ## 构建
 
@@ -60,6 +60,12 @@ Windows 上安装后需**重开终端**，`setx` 对已打开的窗口不生效�
 ./omres-cli task blacklist-check --body '{"gitForm":{"repositoryUrl":"ssh://git@code.example.com:2222/group/project.git","branchName":"refs/heads/main","microService":"ompublic","importTags":"perf","importModuleTreeJson":"[]"},"taskId":12345}'
 ./omres-cli task import-git --body '{"gitForm":{"repositoryUrl":"ssh://git@code.example.com:2222/group/project.git","branchName":"refs/heads/main","microService":"ompublic","importTags":"perf","importModuleTreeJson":"[]"},"taskId":12345,"taskName":"demo"}'
 
+`repositoryUrl` 支持多个仓库，以分号连接；在命令行中应使用引号包住整个参数值。
+
+# 创建 Git 提交并查询异步任务状态
+./omres-cli task create-git-commit --taskId 48861 --body-file ./udg-commit.json
+./omres-cli task git-commit-status --taskId 48861
+
 # 从文件读 body
 ./omres-cli mml-command upsert --body-file ./cmd.json
 
@@ -67,12 +73,12 @@ Windows 上安装后需**重开终端**，`setx` 对已打开的窗口不生效�
 ./omres-cli raw /api/some/newEndpoint -X POST --body '{}'
 ```
 
-### 命令分组（69 接口）
+### 命令分组（71 接口）
 
 | group | actions |
 |-------|---------|
 | auth | login, status, logout |
-| task | create, pull-branch, resource-types, is-empty, blacklist-check, import-git, export-struct, export-result, download, export-validate, include-alarm, delete-one ⚠, delete-many ⚠ |
+| task | create, pull-branch, resource-types, is-empty, blacklist-check, import-git, create-git-commit, git-commit-status, export-struct, export-result, download, export-validate, include-alarm, delete-one ⚠, delete-many ⚠ |
 | upload | file, parse-xml |
 | moc | add-name, select-name, insert-info, generate-script |
 | moc-field | add-name, select-name, update-info |

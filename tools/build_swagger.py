@@ -1351,13 +1351,14 @@ add("/bxapi/perf/class/multiDel", "delete", "批量删除性能测量对象（pe
 
 # 65. 拉取 Git 分支并列出微服务
 add("/api/autoGit/getMicroServices", "get", "拉取 Git 分支并返回微服务列表",
-    [query_param("repositoryUrl", "string", True, "Git 仓库 SSH 地址"),
+    [query_param("repositoryUrl", "string", True, "Git 仓库 SSH 地址；多个仓库以分号分隔"),
      query_param("branchName", "string", True, "分支完整引用，如 refs/heads/main"),
      query_param("taskId", "integer", True, "目标工程/任务 ID"),
      query_param("taskName", "string", True, "目标工程/任务名称"),
      query_param("resolveConflict", "integer", True, "是否解决冲突；不解决传 0")],
     ["Task"],
-    description="服务端拉取指定 Git 分支，并返回仓库中可供选择的微服务目录。",
+    description="服务端拉取指定 Git 分支，并返回仓库中可供选择的微服务目录。"
+                "repositoryUrl 支持以分号连接多个仓库地址。",
     responses=status_resp(
         {"type": "array", "items": {"type": "string"}, "description": "可选微服务列表"},
         "查询结果提示"))
@@ -1385,7 +1386,7 @@ add("/myapi/upload/isEmptyProject", "post", "判断工程是否为空",
 
 # 68. Git 模型黑名单校验
 git_form = obj([
-    ("repositoryUrl", "string", "Git 仓库 SSH 地址，如 ssh://git@host:2222/group/project.git"),
+    ("repositoryUrl", "string", "Git 仓库 SSH 地址；多个仓库以分号分隔"),
     ("branchName", "string", "要导入的分支完整引用，如 refs/heads/main"),
     ("microService", "string", "导入到的微服务名称，如 ompublic"),
     ("importTags", "string", "导入的模型标签，如 perf"),
@@ -1416,7 +1417,56 @@ add("/api/autoGit/importInfoFormGit", "post", "使用 Git 导入 5G 建模模型
     responses=raw_resp({"type": "object", "properties": {
         "status": {"type": "boolean", "description": "是否导入成功；false 表示业务失败"},
         "message": {"type": "string", "description": "导入结果提示，如「导入成功」"},
+        "errorMessage": {"type": "string", "description": "导入失败的详细原因"},
+        "step": {"type": "string", "description": "导入执行步骤或失败步骤，如 error"},
     }}))
+
+# 70. 创建 UDG Git 提交
+add("/api/udgExport/", "post", "创建 UDG Git 提交",
+    [query_param("taskId", "integer", True, "目标工程/任务 ID")] +
+    body([("task_name", "string", "工程/任务名称"),
+          ("branch", "string", "提交目标分支，不带 refs/heads/ 前缀"),
+          ("w3_account", "string", "提交人的 W3 账号"),
+          ("ms_list", arr_of({"type": "string"}), "要提交的微服务列表"),
+          ("repo_list", arr_of({"type": "string"}), "要提交的仓库名称列表"),
+          ("task_types", arr_of({"type": "string"}), "生成并提交的任务类型列表"),
+          ("change_obj_list", arr_of(obj([], [])), "变更对象列表，无指定对象时传 []"),
+          ("ne_type", "string", "网元类型，如 UDG"),
+          ("commit_msg", "string", "Git 提交说明")],
+         ["task_name", "branch", "w3_account", "ms_list", "repo_list", "task_types",
+          "change_obj_list", "ne_type", "commit_msg"]),
+    ["Task"],
+    description="根据工程中的建模数据创建 Git 提交，并启动 Pipeline-X 异步任务。"
+                "响应中的 jobId 可用于在 Pipeline-X 查看任务；后续使用 git-commit-status 查询完成状态。",
+    responses=raw_resp({"type": "object", "properties": {
+        "status": {"type": "boolean", "description": "是否成功启动异步任务"},
+        "data": {"type": "object", "properties": {
+            "jobId": {"type": "string", "description": "Pipeline-X 任务 ID"},
+            "url": {"type": "string", "description": "Pipeline-X 任务页面"},
+        }},
+        "message": {"type": "string", "description": "执行结果提示"},
+    }}))
+
+# 71. 查询 UDG Git 提交状态
+add("/api/udgExport/queryUdgExportTask/", "get", "查询 UDG Git 提交状态",
+    [query_param("taskId", "integer", True, "目标工程/任务 ID")],
+    ["Task"],
+    description="查询创建 Git 提交的 Pipeline-X 异步任务。pxStatus 为「运行中」时继续轮询；"
+                "为「已完成」时 resultLink 提供结果压缩包地址。",
+    responses=status_resp(
+        arr_of(obj([
+            ("id", "integer", "记录 ID"),
+            ("taskId", "integer", "工程/任务 ID"),
+            ("taskTypes", "string", "以分号分隔的任务类型"),
+            ("pxLink", "string", "Pipeline-X 任务页面"),
+            ("pxJobId", "string", "Pipeline-X 任务 ID"),
+            ("pxStatus", "string", "任务状态，如运行中、已完成"),
+            ("resultLink", "string", "完成后的结果压缩包地址，可为 null"),
+            ("createTime", "string", "任务创建时间"),
+            ("stepIndex", "integer", "当前步骤序号"),
+            ("stepStatus", "string", "当前步骤状态"),
+        ], [], "UDG Git 提交任务")),
+        "查询结果提示"))
 
 
 swagger = {
