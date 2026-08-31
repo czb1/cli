@@ -807,6 +807,17 @@
             "description": "查询告警服务列表，按 serviceName 反查其 id（即后续的 serviceId）",
             "example": "omres-cli alarm-service list --body '{\"taskId\":2947}'"
           }
+        },
+        {
+          "http": {
+            "path": "/api/alarmService/deleteOne",
+            "method": "POST"
+          },
+          "cli": {
+            "action": "delete-one",
+            "description": "删除单个告警服务，id 取自 list 返回的 id；先删干净其下的告警（破坏性操作，需要 --yes 确认）",
+            "example": "omres-cli alarm-service delete-one --body '{\"taskId\":2947,\"id\":114}' --yes"
+          }
         }
       ]
     },
@@ -833,6 +844,17 @@
             "action": "list",
             "description": "查询指定告警服务下的告警列表。返回的 id 是内部主键（后续 alarmInternalId 用它），alarmId 是后端分配的告警号字符串",
             "example": "omres-cli alarm list --body '{\"taskId\":2947,\"serviceId\":92}'"
+          }
+        },
+        {
+          "http": {
+            "path": "/sbbapi/resource/alarm/del",
+            "method": "DELETE"
+          },
+          "cli": {
+            "action": "delete-name",
+            "description": "删除告警：id 传 alarm list 返回的内部主键，name 传对应的 alarmChineseName，user 传本人 W3 账号（破坏性操作，需要 --yes 确认）",
+            "example": "omres-cli alarm delete-name --body '{\"id\":100930,\"name\":\"测试知识库版本不匹配模型测试\",\"user\":\"m30049190\"}' --yes"
           }
         }
       ]

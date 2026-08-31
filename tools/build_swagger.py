@@ -1469,6 +1469,35 @@ add("/api/udgExport/queryUdgExportTask/", "get", "查询 UDG Git 提交状态",
         "查询结果提示"))
 
 
+# ---------------------------------------------------------------------------
+# 告警删除（72~73）
+#
+# 告警与告警服务的删除接口，与上面的告警建模接口成对：先删告警，再删空的告警服务。
+# 两者都返回 {status, message}，status=false 表示业务失败。
+
+# 72. 删除告警
+add("/sbbapi/resource/alarm/del", "delete", "删除告警（按告警内部主键 + 告警名称）",
+    body([("id", "integer", "告警内部主键ID（alarm list 返回的 id，不是告警号 alarmId）"),
+          ("name", "string", "告警名称，取自 alarm list 返回的 alarmChineseName，需与 id 对应"),
+          ("user", "string", "操作人 W3 账号，与 auth login 的用户名一致，如 m30049190")],
+         ["id", "name", "user"]),
+    ["Alarm"],
+    description="破坏性操作（HTTP DELETE + 请求体）：删除单个告警，连同其枚举与参数一起删掉。"
+                "入参不带 taskId，id 必须是 alarm list 返回的内部主键，"
+                "传成告警号 alarmId 会删错对象。响应 message 为「删除成功」表示删除完成。",
+    responses=ALARM_OK)
+
+# 73. 删除告警服务
+add("/api/alarmService/deleteOne", "post", "删除告警服务",
+    body([("taskId", "integer", "工程/任务ID"),
+          ("id", "integer", "告警服务ID，取自 alarm-service list 返回的 id")],
+         ["taskId", "id"]),
+    ["Alarm"],
+    description="破坏性操作：删除单个告警服务。删除前先用 alarm list 确认该服务下的告警已删干净"
+                "（alarm delete-name），否则会留下残留引用。响应的 message 可能为空串，以 status 判断结果。",
+    responses=ALARM_OK)
+
+
 swagger = {
     "swagger": "2.0",
     "info": {

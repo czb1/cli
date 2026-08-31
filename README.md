@@ -8,7 +8,7 @@
 - **AI 可探索**：`--help`（分层）+ `describe`（完整语义契约）。
 - **零业务逻辑**：CLI 仅作 HTTP 客户端，调用 `https://omtool.rnd.huawei.com`。
 
-覆盖接口文档中全部 **71** 个接口。
+覆盖接口文档中全部 **73** 个接口。
 
 ## 构建
 
@@ -73,7 +73,7 @@ Windows 上安装后需**重开终端**，`setx` 对已打开的窗口不生效�
 ./omres-cli raw /api/some/newEndpoint -X POST --body '{}'
 ```
 
-### 命令分组（71 接口）
+### 命令分组（73 接口）
 
 | group | actions |
 |-------|---------|
@@ -96,8 +96,8 @@ Windows 上安装后需**重开终端**，`setx` 对已打开的窗口不生效�
 | overallview | search, micro-service-list |
 | resource | auto-gen-id, north-auto-gen-id |
 | perf | dimension-add, object-add, indicator-group-add, indicator-add, indicator-update, language-resource-add, language-resource-delete ⚠, indicator-delete ⚠, indicator-group-delete ⚠, object-delete ⚠, dimension-delete ⚠ |
-| alarm-service | upsert, list |
-| alarm | upsert, list |
+| alarm-service | upsert, list, delete-one ⚠ |
+| alarm | upsert, list, delete-name ⚠ |
 | alarm-enum | upsert, list |
 | alarm-enum-value | upsert |
 | alarm-para | upsert, list |
@@ -132,6 +132,27 @@ CLI 只提供原子命令，**不做编排**——下面每一步的入参需要
 > ⚠ **易错点**：`alarm-enum list` / `alarm-para list` 的入参名叫 `alarmId`，
 > 但要传的是告警的**内部主键 `id`**（第 4 步响应里的 `id`，如 `96`），
 > 不是后端分配的告警号字符串（如 `"100910"`）。`alarmInternalId` 同理。
+
+### 告警回滚（删除）
+
+删错或要重来时按**与创建相反的顺序**删：先删告警，再删空掉的告警服务。
+两个命令都是破坏性的，需要 `--yes`（也支持 `--dry-run` 预览）：
+
+```bash
+# 1) 删告警：id 用 alarm list 返回的内部主键，name 用同一条记录的 alarmChineseName
+omres-cli alarm delete-name \
+  --body '{"id":100930,"name":"测试知识库版本不匹配模型测试","user":"m30049190"}' --yes
+# → {"status":true,"message":"删除成功"}
+
+# 2) 再删告警服务：id 用 alarm-service list 返回的 id
+omres-cli alarm-service delete-one --body '{"taskId":2947,"id":114}' --yes
+# → {"status":true,"message":""}
+```
+
+> ⚠ `alarm delete-name` 的请求体**不带 `taskId`**，只靠 `id` 定位告警——传成告警号
+> `alarmId`（如 `"100910"`）会删错对象，务必用 `alarm list` 返回的内部主键 `id`。
+> `user` 是操作人的 W3 账号，与 `auth login` 用的用户名一致，CLI 不会自动填。
+> `alarm-service delete-one` 成功时 `message` 可能是空串，按 `status` 判断结果。
 
 ### 维度与测量对象注册（perf dimension-add / object-add）
 
