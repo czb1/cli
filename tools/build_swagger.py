@@ -1469,6 +1469,139 @@ add("/api/udgExport/queryUdgExportTask/", "get", "查询 UDG Git 提交状态",
         "查询结果提示"))
 
 
+# ---------------------------------------------------------------------------
+# 告警删除（72~73）
+#
+# 告警与告警服务的删除接口，与上面的告警建模接口成对：先删告警，再删空的告警服务。
+# 两者都返回 {status, message}，status=false 表示业务失败。
+
+# 72. 删除告警
+add("/sbbapi/resource/alarm/del", "delete", "删除告警（按告警内部主键 + 告警名称）",
+    body([("id", "integer", "告警内部主键ID（alarm list 返回的 id，不是告警号 alarmId）"),
+          ("name", "string", "告警名称，取自 alarm list 返回的 alarmChineseName，需与 id 对应"),
+          ("user", "string", "操作人 W3 账号，与 auth login 的用户名一致，如 m30049190")],
+         ["id", "name", "user"]),
+    ["Alarm"],
+    description="破坏性操作（HTTP DELETE + 请求体）：删除单个告警，连同其枚举与参数一起删掉。"
+                "入参不带 taskId，id 必须是 alarm list 返回的内部主键，"
+                "传成告警号 alarmId 会删错对象。响应 message 为「删除成功」表示删除完成。",
+    responses=ALARM_OK)
+
+# 73. 删除告警服务
+add("/api/alarmService/deleteOne", "post", "删除告警服务",
+    body([("taskId", "integer", "工程/任务ID"),
+          ("id", "integer", "告警服务ID，取自 alarm-service list 返回的 id")],
+         ["taskId", "id"]),
+    ["Alarm"],
+    description="破坏性操作：删除单个告警服务。删除前先用 alarm list 确认该服务下的告警已删干净"
+                "（alarm delete-name），否则会留下残留引用。响应的 message 可能为空串，以 status 判断结果。",
+    responses=ALARM_OK)
+
+
+# ---------------------------------------------------------------------------
+# UDG 导出与 Git 提交前置步骤（74~79）
+#
+# 前端「导出到 Git」向导的完整调用顺序（taskId/taskName 全程不变）：
+#   1. export-middleware        导出中间件
+#   2. commit-prepare           提交推送前准备
+#   3. commit-validate          提交前校验
+#   4. git-commit-task-add      插入导出任务记录（stepIndex=1, stepStatus=process）
+#   5. git-commit-task-update   stepIndex=2, stepStatus=process
+#   6. copy-to-git              目录转换（拷贝资源到 Git 目录结构）
+#   7. git-commit-task-update   stepIndex=3, stepStatus=process
+#   8. create-git-commit        创建提交并启动 Pipeline-X（见 70）
+#   9. git-commit-task-update   stepIndex=3, stepStatus=finish
+#  10. git-commit-status        轮询 pxStatus / resultLink（见 71）
+#
+# 4/5/7/9 只是把向导进度写进任务记录，不做实际导出动作，但 git-commit-status
+# 返回的 stepIndex/stepStatus 就来自这里，跳过会让记录停在旧状态。
+
+# 这批接口返回 {status, message}，不是 {code,msg,data}。
+AUTOGIT_OK = raw_resp({"type": "object", "properties": {
+    "status": {"type": "boolean", "description": "是否成功；false 表示业务失败"},
+    "message": {"type": "string", "description": "执行结果提示，如「中间件导出成功!」「校验通过」"},
+}})
+
+# 导出任务记录的写接口都返回 {status, data:null, message:""}，以 status 判断结果。
+UDG_TASK_WRITE_RESP = raw_resp({"type": "object", "properties": {
+    "status": {"type": "boolean", "description": "是否成功；false 表示业务失败"},
+    "data": {"type": "object", "description": "无返回数据，固定为 null"},
+    "message": {"type": "string", "description": "提示信息，成功时通常为空串"},
+}})
+
+TASK_ID_QUERY = query_param("taskId", "integer", True, "目标工程/任务 ID")
+
+STEP_FIELDS = [
+    ("stepIndex", "integer", "向导步骤序号：1=导出中间件/准备/校验，2=目录转换，3=创建提交"),
+    ("stepStatus", "string", "步骤状态：process=进行中，finish=已完成"),
+]
+
+# 74. 导出中间件
+add("/api/autoGit/exportResource", "post", "导出中间件",
+    body([("taskId", "integer", "目标工程/任务 ID"),
+          ("taskName", "string", "目标工程/任务名称，与工程实际名称一致")],
+         ["taskId", "taskName"]),
+    ["Task"],
+    description="导出到 Git 的第 1 步：把工程中的建模数据导出成中间件文件，供后续目录转换使用。"
+                "成功时 message 为「中间件导出成功!」。响应 status=false 表示业务失败。",
+    responses=AUTOGIT_OK)
+
+# 75. 提交推送前准备
+add("/api/autoGit/commitPrepare", "post", "提交推送前准备",
+    body([("taskId", "integer", "目标工程/任务 ID"),
+          ("taskName", "string", "目标工程/任务名称")],
+         ["taskId", "taskName"]),
+    ["Task"],
+    description="导出到 Git 的第 2 步：在 export-middleware 之后调用，准备提交推送所需的工作区。"
+                "成功时 message 为「提交推送前准备就绪」。",
+    responses=AUTOGIT_OK)
+
+# 76. 提交前校验
+add("/api/autoGit/commitValidate", "post", "提交前校验",
+    body([("taskId", "integer", "目标工程/任务 ID")], ["taskId"]),
+    ["Task"],
+    description="导出到 Git 的第 3 步：校验待提交内容是否合规，注意入参只有 taskId，不带 taskName。"
+                "成功时 message 为「校验通过」；校验不通过时 status=false，message 说明原因。",
+    responses=AUTOGIT_OK)
+
+# 77. 插入导出任务记录
+add("/api/udgExport/insertUdgExportTask/", "post", "插入 UDG 导出任务记录（路径末尾的斜杠不能去掉）",
+    [TASK_ID_QUERY] +
+    body([("taskTypes",
+           arr_of({"type": "string"},
+                  "本次要生成的任务类型列表，如 [\"cfg_model\",\"head\",\"doc\",\"enum_head\",\"alpha_xml\",\"excel\"]"),
+           "本次要生成的任务类型列表")]
+         + STEP_FIELDS,
+         ["taskTypes", "stepIndex", "stepStatus"]),
+    ["Task"],
+    description="校验通过后新建一条导出任务记录，向导进入第 1 步（stepIndex=1, stepStatus=process）。"
+                "taskId 走查询参数，请求体里不要再带一遍。记录建好后才能用 git-commit-task-update 推进进度，"
+                "git-commit-status 查到的最新一条即本次记录。",
+    responses=UDG_TASK_WRITE_RESP)
+
+# 78. 更新导出任务记录进度
+add("/api/udgExport/updateUdgExportTask/", "post", "更新 UDG 导出任务记录进度（路径末尾的斜杠不能去掉）",
+    [TASK_ID_QUERY] + body(STEP_FIELDS, ["stepIndex", "stepStatus"]),
+    ["Task"],
+    description="推进向导进度，更新该工程最新一条导出任务记录的步骤状态：目录转换前置 2/process、"
+                "创建提交前置 3/process、提交发起后 3/finish。只改进度，不触发导出动作。",
+    responses=UDG_TASK_WRITE_RESP)
+
+# 79. 目录转换（拷贝资源到 Git 目录）
+add("/api/autoGit/copyResToGit", "post", "目录转换：把导出的资源拷贝成 Git 仓库目录结构",
+    body([("taskId", "integer", "目标工程/任务 ID"),
+          ("taskName", "string", "目标工程/任务名称"),
+          ("exportMocTargets",
+           arr_of(obj([], [], "导出目标 MOC"), "限定导出的 MOC 目标列表；全量导出传空数组 []"),
+           "限定导出的 MOC 目标列表；全量导出传空数组 []")],
+         ["taskId", "taskName", "exportMocTargets"]),
+    ["Task"],
+    description="导出到 Git 的第 4 步：在校验通过、任务记录更新到 stepIndex=2 之后调用，"
+                "把中间件产物转换成 Git 仓库的目录结构。成功时 message 为「目录转换完成!」。"
+                "完成后才能调 create-git-commit 真正创建提交。",
+    responses=AUTOGIT_OK)
+
+
 swagger = {
     "swagger": "2.0",
     "info": {

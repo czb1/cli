@@ -6353,6 +6353,454 @@
           }
         }
       }
+    },
+    "/sbbapi/resource/alarm/del": {
+      "delete": {
+        "summary": "删除告警（按告警内部主键 + 告警名称）",
+        "description": "破坏性操作（HTTP DELETE + 请求体）：删除单个告警，连同其枚举与参数一起删掉。入参不带 taskId，id 必须是 alarm list 返回的内部主键，传成告警号 alarmId 会删错对象。响应 message 为「删除成功」表示删除完成。",
+        "tags": [
+          "Alarm"
+        ],
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "告警内部主键ID（alarm list 返回的 id，不是告警号 alarmId）"
+                },
+                "name": {
+                  "type": "string",
+                  "description": "告警名称，取自 alarm list 返回的 alarmChineseName，需与 id 对应"
+                },
+                "user": {
+                  "type": "string",
+                  "description": "操作人 W3 账号，与 auth login 的用户名一致，如 m30049190"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "user"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "boolean",
+                  "description": "是否成功；false 表示业务失败"
+                },
+                "message": {
+                  "type": "string",
+                  "description": "提示信息"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/alarmService/deleteOne": {
+      "post": {
+        "summary": "删除告警服务",
+        "description": "破坏性操作：删除单个告警服务。删除前先用 alarm list 确认该服务下的告警已删干净（alarm delete-name），否则会留下残留引用。响应的 message 可能为空串，以 status 判断结果。",
+        "tags": [
+          "Alarm"
+        ],
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "taskId": {
+                  "type": "integer",
+                  "description": "工程/任务ID"
+                },
+                "id": {
+                  "type": "integer",
+                  "description": "告警服务ID，取自 alarm-service list 返回的 id"
+                }
+              },
+              "required": [
+                "taskId",
+                "id"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "boolean",
+                  "description": "是否成功；false 表示业务失败"
+                },
+                "message": {
+                  "type": "string",
+                  "description": "提示信息"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/autoGit/exportResource": {
+      "post": {
+        "summary": "导出中间件",
+        "description": "导出到 Git 的第 1 步：把工程中的建模数据导出成中间件文件，供后续目录转换使用。成功时 message 为「中间件导出成功!」。响应 status=false 表示业务失败。",
+        "tags": [
+          "Task"
+        ],
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "taskId": {
+                  "type": "integer",
+                  "description": "目标工程/任务 ID"
+                },
+                "taskName": {
+                  "type": "string",
+                  "description": "目标工程/任务名称，与工程实际名称一致"
+                }
+              },
+              "required": [
+                "taskId",
+                "taskName"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "boolean",
+                  "description": "是否成功；false 表示业务失败"
+                },
+                "message": {
+                  "type": "string",
+                  "description": "执行结果提示，如「中间件导出成功!」「校验通过」"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/autoGit/commitPrepare": {
+      "post": {
+        "summary": "提交推送前准备",
+        "description": "导出到 Git 的第 2 步：在 export-middleware 之后调用，准备提交推送所需的工作区。成功时 message 为「提交推送前准备就绪」。",
+        "tags": [
+          "Task"
+        ],
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "taskId": {
+                  "type": "integer",
+                  "description": "目标工程/任务 ID"
+                },
+                "taskName": {
+                  "type": "string",
+                  "description": "目标工程/任务名称"
+                }
+              },
+              "required": [
+                "taskId",
+                "taskName"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "boolean",
+                  "description": "是否成功；false 表示业务失败"
+                },
+                "message": {
+                  "type": "string",
+                  "description": "执行结果提示，如「中间件导出成功!」「校验通过」"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/autoGit/commitValidate": {
+      "post": {
+        "summary": "提交前校验",
+        "description": "导出到 Git 的第 3 步：校验待提交内容是否合规，注意入参只有 taskId，不带 taskName。成功时 message 为「校验通过」；校验不通过时 status=false，message 说明原因。",
+        "tags": [
+          "Task"
+        ],
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "taskId": {
+                  "type": "integer",
+                  "description": "目标工程/任务 ID"
+                }
+              },
+              "required": [
+                "taskId"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "boolean",
+                  "description": "是否成功；false 表示业务失败"
+                },
+                "message": {
+                  "type": "string",
+                  "description": "执行结果提示，如「中间件导出成功!」「校验通过」"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/udgExport/insertUdgExportTask/": {
+      "post": {
+        "summary": "插入 UDG 导出任务记录（路径末尾的斜杠不能去掉）",
+        "description": "校验通过后新建一条导出任务记录，向导进入第 1 步（stepIndex=1, stepStatus=process）。taskId 走查询参数，请求体里不要再带一遍。记录建好后才能用 git-commit-task-update 推进进度，git-commit-status 查到的最新一条即本次记录。",
+        "tags": [
+          "Task"
+        ],
+        "parameters": [
+          {
+            "name": "taskId",
+            "in": "query",
+            "required": true,
+            "type": "integer",
+            "description": "目标工程/任务 ID"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "taskTypes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "本次要生成的任务类型列表，如 [\"cfg_model\",\"head\",\"doc\",\"enum_head\",\"alpha_xml\",\"excel\"]"
+                },
+                "stepIndex": {
+                  "type": "integer",
+                  "description": "向导步骤序号：1=导出中间件/准备/校验，2=目录转换，3=创建提交"
+                },
+                "stepStatus": {
+                  "type": "string",
+                  "description": "步骤状态：process=进行中，finish=已完成"
+                }
+              },
+              "required": [
+                "taskTypes",
+                "stepIndex",
+                "stepStatus"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "boolean",
+                  "description": "是否成功；false 表示业务失败"
+                },
+                "data": {
+                  "type": "object",
+                  "description": "无返回数据，固定为 null"
+                },
+                "message": {
+                  "type": "string",
+                  "description": "提示信息，成功时通常为空串"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/udgExport/updateUdgExportTask/": {
+      "post": {
+        "summary": "更新 UDG 导出任务记录进度（路径末尾的斜杠不能去掉）",
+        "description": "推进向导进度，更新该工程最新一条导出任务记录的步骤状态：目录转换前置 2/process、创建提交前置 3/process、提交发起后 3/finish。只改进度，不触发导出动作。",
+        "tags": [
+          "Task"
+        ],
+        "parameters": [
+          {
+            "name": "taskId",
+            "in": "query",
+            "required": true,
+            "type": "integer",
+            "description": "目标工程/任务 ID"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "stepIndex": {
+                  "type": "integer",
+                  "description": "向导步骤序号：1=导出中间件/准备/校验，2=目录转换，3=创建提交"
+                },
+                "stepStatus": {
+                  "type": "string",
+                  "description": "步骤状态：process=进行中，finish=已完成"
+                }
+              },
+              "required": [
+                "stepIndex",
+                "stepStatus"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "boolean",
+                  "description": "是否成功；false 表示业务失败"
+                },
+                "data": {
+                  "type": "object",
+                  "description": "无返回数据，固定为 null"
+                },
+                "message": {
+                  "type": "string",
+                  "description": "提示信息，成功时通常为空串"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/autoGit/copyResToGit": {
+      "post": {
+        "summary": "目录转换：把导出的资源拷贝成 Git 仓库目录结构",
+        "description": "导出到 Git 的第 4 步：在校验通过、任务记录更新到 stepIndex=2 之后调用，把中间件产物转换成 Git 仓库的目录结构。成功时 message 为「目录转换完成!」。完成后才能调 create-git-commit 真正创建提交。",
+        "tags": [
+          "Task"
+        ],
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "taskId": {
+                  "type": "integer",
+                  "description": "目标工程/任务 ID"
+                },
+                "taskName": {
+                  "type": "string",
+                  "description": "目标工程/任务名称"
+                },
+                "exportMocTargets": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "description": "导出目标 MOC",
+                    "properties": {}
+                  },
+                  "description": "限定导出的 MOC 目标列表；全量导出传空数组 []"
+                }
+              },
+              "required": [
+                "taskId",
+                "taskName",
+                "exportMocTargets"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "boolean",
+                  "description": "是否成功；false 表示业务失败"
+                },
+                "message": {
+                  "type": "string",
+                  "description": "执行结果提示，如「中间件导出成功!」「校验通过」"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   }
 }
