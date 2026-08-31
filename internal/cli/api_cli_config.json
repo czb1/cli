@@ -99,6 +99,72 @@
         },
         {
           "http": {
+            "path": "/api/autoGit/exportResource",
+            "method": "POST"
+          },
+          "cli": {
+            "action": "export-middleware",
+            "description": "导出到 Git 第 1 步：导出中间件",
+            "example": "omres-cli task export-middleware --body '{\"taskId\":48898,\"taskName\":\"DGW_NLS_VPNUEACCCTRL01_v3\"}'"
+          }
+        },
+        {
+          "http": {
+            "path": "/api/autoGit/commitPrepare",
+            "method": "POST"
+          },
+          "cli": {
+            "action": "commit-prepare",
+            "description": "导出到 Git 第 2 步：提交推送前准备",
+            "example": "omres-cli task commit-prepare --body '{\"taskId\":48898,\"taskName\":\"DGW_NLS_VPNUEACCCTRL01_v3\"}'"
+          }
+        },
+        {
+          "http": {
+            "path": "/api/autoGit/commitValidate",
+            "method": "POST"
+          },
+          "cli": {
+            "action": "commit-validate",
+            "description": "导出到 Git 第 3 步：提交前校验，入参只有 taskId",
+            "example": "omres-cli task commit-validate --body '{\"taskId\":48898}'"
+          }
+        },
+        {
+          "http": {
+            "path": "/api/udgExport/insertUdgExportTask/",
+            "method": "POST"
+          },
+          "cli": {
+            "action": "git-commit-task-add",
+            "description": "插入导出任务记录，向导进度置为 stepIndex=1/process；taskId 走查询参数",
+            "example": "omres-cli task git-commit-task-add --taskId 48898 --body '{\"taskTypes\":[\"cfg_model\",\"head\",\"doc\",\"enum_head\",\"alpha_xml\",\"excel\"],\"stepIndex\":1,\"stepStatus\":\"process\"}'"
+          }
+        },
+        {
+          "http": {
+            "path": "/api/udgExport/updateUdgExportTask/",
+            "method": "POST"
+          },
+          "cli": {
+            "action": "git-commit-task-update",
+            "description": "更新导出任务记录的向导进度（stepIndex/stepStatus），只改进度不触发导出",
+            "example": "omres-cli task git-commit-task-update --taskId 48898 --body '{\"stepIndex\":2,\"stepStatus\":\"process\"}'"
+          }
+        },
+        {
+          "http": {
+            "path": "/api/autoGit/copyResToGit",
+            "method": "POST"
+          },
+          "cli": {
+            "action": "copy-to-git",
+            "description": "目录转换：把中间件产物拷贝成 Git 仓库目录结构，全量导出时 exportMocTargets 传 []",
+            "example": "omres-cli task copy-to-git --body '{\"taskId\":48898,\"taskName\":\"DGW_NLS_VPNUEACCCTRL01_v3\",\"exportMocTargets\":[]}'"
+          }
+        },
+        {
+          "http": {
             "path": "/api/udgExport/",
             "method": "POST"
           },

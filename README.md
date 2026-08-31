@@ -8,7 +8,7 @@
 - **AI 可探索**：`--help`（分层）+ `describe`（完整语义契约）。
 - **零业务逻辑**：CLI 仅作 HTTP 客户端，调用 `https://omtool.rnd.huawei.com`。
 
-覆盖接口文档中全部 **73** 个接口。
+覆盖接口文档中全部 **79** 个接口。
 
 ## 构建
 
@@ -62,7 +62,7 @@ Windows 上安装后需**重开终端**，`setx` 对已打开的窗口不生效�
 
 `repositoryUrl` 支持多个仓库，以分号连接；在命令行中应使用引号包住整个参数值。
 
-# 创建 Git 提交并查询异步任务状态
+# 创建 Git 提交并查询异步任务状态（完整 10 步见「导出到 Git（UDG 提交）：调用顺序」）
 ./omres-cli task create-git-commit --taskId 48861 --body-file ./udg-commit.json
 ./omres-cli task git-commit-status --taskId 48861
 
@@ -73,12 +73,12 @@ Windows 上安装后需**重开终端**，`setx` 对已打开的窗口不生效�
 ./omres-cli raw /api/some/newEndpoint -X POST --body '{}'
 ```
 
-### 命令分组（73 接口）
+### 命令分组（79 接口）
 
 | group | actions |
 |-------|---------|
 | auth | login, status, logout |
-| task | create, pull-branch, resource-types, is-empty, blacklist-check, import-git, create-git-commit, git-commit-status, export-struct, export-result, download, export-validate, include-alarm, delete-one ⚠, delete-many ⚠ |
+| task | create, pull-branch, resource-types, is-empty, blacklist-check, import-git, export-middleware, commit-prepare, commit-validate, git-commit-task-add, git-commit-task-update, copy-to-git, create-git-commit, git-commit-status, export-struct, export-result, download, export-validate, include-alarm, delete-one ⚠, delete-many ⚠ |
 | upload | file, parse-xml |
 | moc | add-name, select-name, insert-info, generate-script |
 | moc-field | add-name, select-name, update-info |
@@ -104,6 +104,53 @@ Windows 上安装后需**重开终端**，`setx` 对已打开的窗口不生效�
 
 标 ⚠ 的是破坏性命令，详见下方「破坏性操作」。
 此外还有一个不属于任何 group 的 `raw` 命令，用于直调尚未收录的接口。
+
+### 导出到 Git（UDG 提交）：调用顺序
+
+建模完成后把工程导出并提交到 Git，共 10 步，`taskId` / `taskName` 全程不变。
+CLI 不做编排，按下表逐条调用即可：
+
+| # | 命令 | 请求体 / 参数 | 成功响应 |
+|---|------|--------------|---------|
+| 1 | `task export-middleware` | `{"taskId":48898,"taskName":"..."}` | `message` = 中间件导出成功! |
+| 2 | `task commit-prepare` | `{"taskId":48898,"taskName":"..."}` | `message` = 提交推送前准备就绪 |
+| 3 | `task commit-validate` | `{"taskId":48898}`（**没有** taskName） | `message` = 校验通过 |
+| 4 | `task git-commit-task-add` | `--taskId` + `{"taskTypes":[...],"stepIndex":1,"stepStatus":"process"}` | `status:true` |
+| 5 | `task git-commit-task-update` | `--taskId` + `{"stepIndex":2,"stepStatus":"process"}` | `status:true` |
+| 6 | `task copy-to-git` | `{"taskId":48898,"taskName":"...","exportMocTargets":[]}` | `message` = 目录转换完成! |
+| 7 | `task git-commit-task-update` | `--taskId` + `{"stepIndex":3,"stepStatus":"process"}` | `status:true` |
+| 8 | `task create-git-commit` | `--taskId` + 提交表单（见下） | `data.jobId` / `data.url` |
+| 9 | `task git-commit-task-update` | `--taskId` + `{"stepIndex":3,"stepStatus":"finish"}` | `status:true` |
+| 10 | `task git-commit-status` | `--taskId` | 轮询 `pxStatus` / `resultLink` |
+
+```bash
+T=48898; N=DGW_NLS_VPNUEACCCTRL01_v3
+
+omres-cli task export-middleware --body "{\"taskId\":$T,\"taskName\":\"$N\"}"
+omres-cli task commit-prepare    --body "{\"taskId\":$T,\"taskName\":\"$N\"}"
+omres-cli task commit-validate   --body "{\"taskId\":$T}"
+
+omres-cli task git-commit-task-add --taskId $T \
+  --body '{"taskTypes":["cfg_model","head","doc","enum_head","alpha_xml","excel"],"stepIndex":1,"stepStatus":"process"}'
+omres-cli task git-commit-task-update --taskId $T --body '{"stepIndex":2,"stepStatus":"process"}'
+
+omres-cli task copy-to-git --body "{\"taskId\":$T,\"taskName\":\"$N\",\"exportMocTargets\":[]}"
+omres-cli task git-commit-task-update --taskId $T --body '{"stepIndex":3,"stepStatus":"process"}'
+
+omres-cli task create-git-commit --taskId $T --body-file ./udg-commit.json
+omres-cli task git-commit-task-update --taskId $T --body '{"stepIndex":3,"stepStatus":"finish"}'
+
+# 轮询到 pxStatus=已完成 后，resultLink 就是结果压缩包地址
+omres-cli task git-commit-status --taskId $T
+```
+
+- 第 4/5/7/9 步（`git-commit-task-add` / `git-commit-task-update`）只把向导进度写进导出任务记录，
+  不触发任何导出动作；但 `git-commit-status` 返回的 `stepIndex`/`stepStatus` 就来自这里，跳过会停在旧状态。
+- 这两个命令的 `taskId` 走**查询参数**（`--taskId`），请求体里不要再带一遍；
+  `create-git-commit` 同理。
+- `git-commit-status` 返回的是该工程的**历史记录列表**，最新一条在最前；
+  `pxStatus` 为「未启动」表示第 8 步还没发起，「运行中」时继续轮询。
+- 这批接口都以 `{"status":false}` 表达业务失败（HTTP 仍是 200），CLI 会转成 `Operation Failed` 错误。
 
 ### 告警建模：调用顺序
 
