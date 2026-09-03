@@ -11,6 +11,11 @@ import (
 // EnvPrefix is used to build override env var names, e.g. OMRES_SERVER.
 const EnvPrefix = "OMRES"
 
+// DefaultTimeout 是所有接口默认的请求超时秒数。
+// 服务端部分接口（导入、编译、批量校验等）耗时较长，默认给足 20 分钟，
+// 需要更短可用 --timeout 或 OMRES_TIMEOUT 覆盖。
+const DefaultTimeout = 1200
+
 // LoadConfig parses the embedded config bytes.
 func LoadConfig(data []byte) (*Config, error) {
 	var cfg Config
@@ -18,7 +23,7 @@ func LoadConfig(data []byte) (*Config, error) {
 		return nil, fmt.Errorf("解析配置失败: %w", err)
 	}
 	if cfg.Defaults.Timeout == 0 {
-		cfg.Defaults.Timeout = 30
+		cfg.Defaults.Timeout = DefaultTimeout
 	}
 	if cfg.Defaults.Output == "" {
 		cfg.Defaults.Output = "json"
