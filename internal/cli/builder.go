@@ -42,7 +42,7 @@ func BuildRootCommand(cfg *Config, sw *Swagger) *Command {
 
 	pf := root.PersistentFlags()
 	pf.StringVar(&g.server, "server", "", "服务器地址，覆盖配置 (env "+EnvPrefix+"_SERVER)")
-	pf.IntVar(&g.timeout, "timeout", 0, "请求超时秒数，覆盖配置")
+	pf.IntVar(&g.timeout, "timeout", 0, fmt.Sprintf("请求超时秒数，覆盖配置（默认 %d）", DefaultTimeout))
 	pf.BoolVar(&g.debug, "debug", false, "开启调试日志")
 	pf.StringVar(&g.token, "token", "", "Bearer Token，覆盖配置 (env "+EnvPrefix+"_AUTH_TOKEN)")
 	pf.StringVar(&g.apiKey, "api-key", "", "API Key，覆盖配置 (env "+EnvPrefix+"_AUTH_API_KEY)")

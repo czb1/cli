@@ -3,7 +3,7 @@
   "defaults": {
     "server": "https://omtool.rnd.huawei.com",
     "output": "json",
-    "timeout": 30,
+    "timeout": 1200,
     "auth": {
       "type": "cookie",
       "cookie": "",
