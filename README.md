@@ -451,7 +451,7 @@ omres-cli auth logout
 ### 会话有效期
 
 - 后端 Cookie 带 `Expires` / `Max-Age` → 以后端为准。
-- 只下发会话 Cookie（无过期时间）→ 本地按软 TTL **8 小时**判定，可用 `OMRES_SESSION_TTL_HOURS` 覆盖。
+- 只下发会话 Cookie（无过期时间）→ CLI 不设置本地过期时间，持续使用该 Cookie，直到后端拒绝会话或用户执行 `auth logout`。
 
 ### 凭证来源优先级
 
