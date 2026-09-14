@@ -175,7 +175,6 @@ func buildAuthLoginCommand(cfg *Config) *Command {
 			result["expires_at"] = sess.ExpiresAt
 		} else {
 			result["expires_at"] = nil
-			result["ttl_hours"] = int(sessionTTL().Hours())
 		}
 		if _, msg, ok := businessCode(payload); ok && msg != "" {
 			result["msg"] = msg
