@@ -546,6 +546,17 @@
       "resources": [
         {
           "http": {
+            "path": "/api/mmlPara/insertOrUpdate",
+            "method": "POST"
+          },
+          "cli": {
+            "action": "upsert",
+            "description": "新增或修改MML参数（含数据来源 source），请求体为 taskId + mmlParaTable",
+            "example": "omres-cli mml-para upsert --body-file ./mml-para.json"
+          }
+        },
+        {
+          "http": {
             "path": "/api/mmlPara/list1",
             "method": "POST"
           },

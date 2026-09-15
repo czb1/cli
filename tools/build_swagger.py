@@ -502,6 +502,71 @@ add("/api/mmlPara/list1", "post", "查询MML参数列表，用于新增参数场
           ("mocId", "integer", "MOC ID")], ["commandId"]),
     ["MmlPara"], data=DATA_ARR)
 
+# MML 参数保存：与 commandPara 的命令参数关联配置是两个独立接口。
+# 基于前端请求样本；null 字段不推断其非空类型，未列出的字段仍原样透传。
+mml_para_table = obj([
+    ("id", "integer", "MML参数记录ID，修改时传入"),
+    ("paraName", "string", "参数名称，如 SUBAPPIDNAME"),
+    ("paraDescEn", "string", "参数英文名称"),
+    ("paraDescCh", "string", "参数中文名称"),
+    ("customizeDataTypeId", "integer", "自定义数据类型ID"),
+    ("mmlDataTypeId", "integer", "MML数据类型ID"),
+    ("fieldDataTypeId", "integer", "字段数据类型ID"),
+    ("fieldId", "integer", "字段ID"),
+    ("mocId", "integer", "MOC ID"),
+    ("eaguId", "string", "EAGU ID"),
+    ("source", {"type": "string", "enum": ["本端规划", "全网规划", "对端协商"]},
+     "数据来源：本端规划、全网规划或对端协商；位于 mmlParaTable 内"),
+    ("unit", "string", "单位，未设置时为空字符串"),
+    ("isTranslate", "string", "翻译标记"),
+    ("minValue", "number", "最小值"),
+    ("maxValue", "number", "最大值"),
+    ("min", "number", "最小边界配置"),
+    ("max", "number", "最大边界配置"),
+    ("labelName", "string", "范围标签，如字符串长度"),
+    ("range", "string", "范围表达式，如 0~63"),
+    ("ranges", arr_of(obj([("min", "string", "范围下限"),
+                             ("max", "string", "范围上限")], [])), "范围列表"),
+    ("extendEnumRanges", arr_of(obj([], [])), "扩展枚举范围列表"),
+    ("extendEnumValue", "string", "扩展枚举值"),
+    ("isGenExtendBranchHelp", "integer", "是否生成扩展分支帮助，0=否，1=是"),
+    ("isMappingCfg", "integer", "是否映射配置"),
+    ("meaningCh", "string", "参数含义中文"),
+    ("meaningEn", "string", "参数含义英文"),
+    ("limitCh", "string", "取值限制中文"),
+    ("limitEn", "string", "取值限制英文"),
+    ("configCh", "string", "配置说明中文"),
+    ("configEn", "string", "配置说明英文"),
+    ("dependMmlName", "string", "依赖MML名称"),
+    ("dependMmlPara", "string", "依赖MML参数"),
+    ("userDefinedCh", "string", "自定义说明中文"),
+    ("userDefinedEn", "string", "自定义说明英文"),
+    ("invalidValue", "string", "无效值"),
+] + [(name, "boolean", "前端中文选择标记") for name in
+     ["paraDescChSel", "meaningChSel", "limitChSel", "configChSel", "userDefinedChSel"]]
+  + [(name, {"x-nullable": True}, "样本值为 null；非空类型尚未确认，原样透传") for name in
+     ["isGenHelp", "isInputInvalidValue", "invalidValueIsNull", "isSptMultiLang",
+      "isUserGroup", "mmlDataTypeName", "mocName", "paraCnName", "isMandatory",
+      "isKey", "isIndexField", "cpxcfgMappingCfg"]]
+  + [(name, arr_of(obj([("value", value_type, "选项值"),
+                        ("label", "string", "显示名称")], [])),
+      "前端候选项列表，可随完整请求体透传") for name, value_type in
+     [("sourceOptions", "string"), ("unitOptions", "string"),
+      ("udgUnitOptions", "string"), ("isGenHelpOptions", "integer")]],
+    desc="MML参数对象；字段按前端请求样本记录，后端必填规则以实际校验为准")
+add("/api/mmlPara/insertOrUpdate", "post", "新增或修改MML参数（含数据来源）",
+    body([("taskId", "integer", "工程/任务ID"),
+          ("mmlParaTable", mml_para_table, "MML参数对象")],
+         ["taskId", "mmlParaTable"]),
+    ["MmlPara"],
+    description="保存MML参数及数据来源 mmlParaTable.source。"
+                "与 command-para upsert 的 commandParaTable 接口不同。"
+                "修改时携带已有记录 id，建议使用完整请求体保留其他字段。"
+                "未列出的字段原样透传。响应 status=false 表示业务失败。",
+    responses=status_resp(
+        {"type": "object", "x-nullable": True, "description": "成功样本为 null，无返回数据"},
+        "结果提示，成功时可为空字符串"))
+
 # 22. 查询命令参数列表
 add("/api/commandPara/list", "post", "查询命令参数列表",
     body([("commandId", "integer", "命令ID")], ["commandId"]),
