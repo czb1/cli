@@ -552,3 +552,37 @@ omres-cli/
 ├── tools/build_swagger.py             # 由 API 文档生成 swagger.json
 └── go.mod
 ```
+
+### MML 命令生效方式
+
+`mml-command upsert` 的 `--body` 和 `--body-file` 支持在
+`mmlCommandTable.effectCh` 中直接填写生效方式短语。例如（其他必填参数照常填写）：
+
+```bash
+omres-cli mml-command upsert --body '{"taskId":49589,"mocTypeId":1,"mmlCommandTable":{"mmlCommandName":"SET TEST","commandType":"update","effectCh":"立即生效"}}'
+```
+
+CLI 会将 `effectCh` 展开为 `该命令执行后立即生效。`，并自动设置
+`effectEn` 为 `This command takes effect immediately after being executed.`。
+所有预设方式都会覆盖这两个字段，并将 `definitiontext`、`definitionEn`、
+`definitionService` 设为空字符串，避免残留上一次的自定义内容。
+
+支持的短语：立即生效、重启系统生效、新激活用户生效、执行SET REFRESHSRV命令后生效、
+关闭跟踪任务，创建新跟踪任务生效、最后一次执行命令90秒后生效、60s生效、30s生效、
+发生承载更新的用户或者新激活用户生效、新数据流生效。
+
+自定义方式需要填写自己的内容，不能仅由“自定义”三个字推导：
+
+```json
+{
+  "effectCh": "自定义",
+  "definitiontext": "测试",
+  "definitionEn": "test",
+  "definitionService": "TEST"
+}
+```
+
+将以上字段放入 `mmlCommandTable`。CLI 会把 `effectCh` 改为 `测试`，
+保留三个定义字段。自定义模式不自动生成 `effectEn`，已提供的值保持不变；
+缺少任一定义字段或值为空时会在发送前报错。
+直接提供完整 `effectCh` 描述的旧请求保持原样。`raw` 命令仍然原样发送请求。
