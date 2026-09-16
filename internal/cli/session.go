@@ -5,18 +5,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 )
 
-const (
-	sessionFileName = "session.json"
-
-	// defaultSessionTTLHours 是后端只下发「会话 Cookie」（没有 Expires/Max-Age）时，
-	// 本地认为会话仍然有效的软上限。可用 OMRES_SESSION_TTL_HOURS 覆盖。
-	defaultSessionTTLHours = 8
-)
+const sessionFileName = "session.json"
 
 // Session 是落盘到 ~/.omres-cli/session.json 的登录态。
 // 字段名与旧版本 sessionData 兼容，旧文件可直接读取。
@@ -45,16 +38,6 @@ func sessionFile() string {
 		return ""
 	}
 	return filepath.Join(d, sessionFileName)
-}
-
-// sessionTTL 返回无显式过期时间时使用的软 TTL。
-func sessionTTL() time.Duration {
-	if v := os.Getenv(EnvPrefix + "_SESSION_TTL_HOURS"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n > 0 {
-			return time.Duration(n) * time.Hour
-		}
-	}
-	return defaultSessionTTLHours * time.Hour
 }
 
 // SaveSession 以 0600 权限写入会话文件。
@@ -151,22 +134,14 @@ func (s *Session) expiresAtTime() time.Time {
 	return t
 }
 
-// Expired 判断会话是否失效，并给出原因：
-//   - "cookie_expired"：后端下发的 Cookie 到期时间已过
-//   - "ttl_exceeded"：无显式到期时间，且落盘时间超过软 TTL
+// Expired 仅根据后端下发的 Cookie 到期时间判断会话是否失效。
+// 会话 Cookie 没有 Expires/Max-Age 时不做本地超时限制，由后端决定是否仍然有效。
 func (s *Session) Expired() (bool, string) {
 	if exp := s.expiresAtTime(); !exp.IsZero() {
 		if time.Now().After(exp) {
 			return true, "cookie_expired"
 		}
 		return false, ""
-	}
-	saved := s.savedAtTime()
-	if saved.IsZero() {
-		return false, ""
-	}
-	if time.Since(saved) > sessionTTL() {
-		return true, "ttl_exceeded"
 	}
 	return false, ""
 }
