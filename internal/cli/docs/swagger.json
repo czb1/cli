@@ -1291,11 +1291,23 @@
                     },
                     "effectCh": {
                       "type": "string",
-                      "description": "影响中文"
+                      "description": "生效方式中文：可填预设短语（如立即生效、30s生效）自动展开中英文；自定义需填写三个definition字段"
                     },
                     "effectEn": {
                       "type": "string",
-                      "description": "影响英文"
+                      "description": "生效方式英文（预设短语自动填入）"
+                    },
+                    "definitiontext": {
+                      "type": "string",
+                      "description": "自定义生效方式中文，自动写入effectCh；预设方式置空"
+                    },
+                    "definitionEn": {
+                      "type": "string",
+                      "description": "自定义生效方式英文；预设方式置空"
+                    },
+                    "definitionService": {
+                      "type": "string",
+                      "description": "自定义生效方式服务；预设方式置空"
                     },
                     "hintCh": {
                       "type": "string",

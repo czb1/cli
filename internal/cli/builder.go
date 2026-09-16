@@ -6,7 +6,6 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-
 )
 
 // CLIName is the tool binary name used in help and examples.
@@ -187,6 +186,15 @@ func buildActionCommand(cfg *Config, sw *Swagger, group string, res Resource, op
 			}
 			if len(body) > 0 && !validJSON(body) {
 				PrintError(id, CodeParseError, "Parse Error", "请求体不是合法 JSON")
+				return nil
+			}
+		}
+
+		if strings.EqualFold(res.HTTP.Method, "POST") && reqPath == "/api/mmlCommand/insertOrUpdate" {
+			var err error
+			body, err = normalizeMMLEffect(body)
+			if err != nil {
+				PrintError(id, CodeInvalidParams, "Invalid Params", err.Error())
 				return nil
 			}
 		}
