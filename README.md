@@ -73,7 +73,7 @@ Windows 上安装后需**重开终端**，`setx` 对已打开的窗口不生效�
 ./omres-cli raw /api/some/newEndpoint -X POST --body '{}'
 ```
 
-### 命令分组（79 接口）
+### 命令分组（80 接口）
 
 | group | actions |
 |-------|---------|
@@ -87,7 +87,7 @@ Windows 上安装后需**重开终端**，`setx` 对已打开的窗口不生效�
 | method | add-name, update-name, delete-name ⚠, select-info |
 | mml-command | upsert, get |
 | command-para | upsert, list |
-| mml-para | list |
+| mml-para | upsert, list |
 | command-branch | upsert, list |
 | validate | do, result |
 | errorcode | shield |
@@ -103,6 +103,26 @@ Windows 上安装后需**重开终端**，`setx` 对已打开的窗口不生效�
 | alarm-para | upsert, list |
 
 标 ⚠ 的是破坏性命令，详见下方「破坏性操作」。
+
+### 保存 MML 参数及数据来源
+
+`mml-para upsert` 调用 `POST /api/mmlPara/insertOrUpdate`，请求体为
+`taskId` + `mmlParaTable`。数据来源字段是 `mmlParaTable.source`，可选
+`本端规划`、`全网规划`、`对端协商`。`sourceOptions` 是前端候选项列表，不是选中的值。
+
+```bash
+./omres-cli describe mml-para upsert
+./omres-cli mml-para upsert --body-file ./mml-para.json
+```
+
+`mml-para.json` 应使用前端抓包或已有记录构造的完整请求体，并在
+`mmlParaTable` 内设置 `"source": "本端规划"`；修改时保留记录的 `id` 和其他字段。
+`--body` 也支持直接传 JSON，包含 null、数组和未列出的字段时均原样透传。
+后端返回 `{"data":null,"message":"","status":true}` 表示成功，`status:false` 表示业务失败。
+
+此命令与 `command-para upsert` 不同：后者调用 `/api/commandPara/insertOrUpdate`，
+使用 `commandParaTable` 配置命令参数关联，不能替代 MML 参数保存。
+
 此外还有一个不属于任何 group 的 `raw` 命令，用于直调尚未收录的接口。
 
 ### 导出到 Git（UDG 提交）：调用顺序

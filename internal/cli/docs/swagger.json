@@ -1925,6 +1925,355 @@
         }
       }
     },
+    "/api/mmlPara/insertOrUpdate": {
+      "post": {
+        "summary": "新增或修改MML参数（含数据来源）",
+        "description": "保存MML参数及数据来源 mmlParaTable.source。与 command-para upsert 的 commandParaTable 接口不同。修改时携带已有记录 id，建议使用完整请求体保留其他字段。未列出的字段原样透传。响应 status=false 表示业务失败。",
+        "tags": [
+          "MmlPara"
+        ],
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "taskId": {
+                  "type": "integer",
+                  "description": "工程/任务ID"
+                },
+                "mmlParaTable": {
+                  "type": "object",
+                  "description": "MML参数对象；字段按前端请求样本记录，后端必填规则以实际校验为准",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "description": "MML参数记录ID，修改时传入"
+                    },
+                    "paraName": {
+                      "type": "string",
+                      "description": "参数名称，如 SUBAPPIDNAME"
+                    },
+                    "paraDescEn": {
+                      "type": "string",
+                      "description": "参数英文名称"
+                    },
+                    "paraDescCh": {
+                      "type": "string",
+                      "description": "参数中文名称"
+                    },
+                    "customizeDataTypeId": {
+                      "type": "integer",
+                      "description": "自定义数据类型ID"
+                    },
+                    "mmlDataTypeId": {
+                      "type": "integer",
+                      "description": "MML数据类型ID"
+                    },
+                    "fieldDataTypeId": {
+                      "type": "integer",
+                      "description": "字段数据类型ID"
+                    },
+                    "fieldId": {
+                      "type": "integer",
+                      "description": "字段ID"
+                    },
+                    "mocId": {
+                      "type": "integer",
+                      "description": "MOC ID"
+                    },
+                    "eaguId": {
+                      "type": "string",
+                      "description": "EAGU ID"
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "本端规划",
+                        "全网规划",
+                        "对端协商"
+                      ]
+                    },
+                    "unit": {
+                      "type": "string",
+                      "description": "单位，未设置时为空字符串"
+                    },
+                    "isTranslate": {
+                      "type": "string",
+                      "description": "翻译标记"
+                    },
+                    "minValue": {
+                      "type": "number",
+                      "description": "最小值"
+                    },
+                    "maxValue": {
+                      "type": "number",
+                      "description": "最大值"
+                    },
+                    "min": {
+                      "type": "number",
+                      "description": "最小边界配置"
+                    },
+                    "max": {
+                      "type": "number",
+                      "description": "最大边界配置"
+                    },
+                    "labelName": {
+                      "type": "string",
+                      "description": "范围标签，如字符串长度"
+                    },
+                    "range": {
+                      "type": "string",
+                      "description": "范围表达式，如 0~63"
+                    },
+                    "ranges": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "description": "",
+                        "properties": {
+                          "min": {
+                            "type": "string",
+                            "description": "范围下限"
+                          },
+                          "max": {
+                            "type": "string",
+                            "description": "范围上限"
+                          }
+                        }
+                      },
+                      "description": ""
+                    },
+                    "extendEnumRanges": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "description": "",
+                        "properties": {}
+                      },
+                      "description": ""
+                    },
+                    "extendEnumValue": {
+                      "type": "string",
+                      "description": "扩展枚举值"
+                    },
+                    "isGenExtendBranchHelp": {
+                      "type": "integer",
+                      "description": "是否生成扩展分支帮助，0=否，1=是"
+                    },
+                    "isMappingCfg": {
+                      "type": "integer",
+                      "description": "是否映射配置"
+                    },
+                    "meaningCh": {
+                      "type": "string",
+                      "description": "参数含义中文"
+                    },
+                    "meaningEn": {
+                      "type": "string",
+                      "description": "参数含义英文"
+                    },
+                    "limitCh": {
+                      "type": "string",
+                      "description": "取值限制中文"
+                    },
+                    "limitEn": {
+                      "type": "string",
+                      "description": "取值限制英文"
+                    },
+                    "configCh": {
+                      "type": "string",
+                      "description": "配置说明中文"
+                    },
+                    "configEn": {
+                      "type": "string",
+                      "description": "配置说明英文"
+                    },
+                    "dependMmlName": {
+                      "type": "string",
+                      "description": "依赖MML名称"
+                    },
+                    "dependMmlPara": {
+                      "type": "string",
+                      "description": "依赖MML参数"
+                    },
+                    "userDefinedCh": {
+                      "type": "string",
+                      "description": "自定义说明中文"
+                    },
+                    "userDefinedEn": {
+                      "type": "string",
+                      "description": "自定义说明英文"
+                    },
+                    "invalidValue": {
+                      "type": "string",
+                      "description": "无效值"
+                    },
+                    "paraDescChSel": {
+                      "type": "boolean",
+                      "description": "前端中文选择标记"
+                    },
+                    "meaningChSel": {
+                      "type": "boolean",
+                      "description": "前端中文选择标记"
+                    },
+                    "limitChSel": {
+                      "type": "boolean",
+                      "description": "前端中文选择标记"
+                    },
+                    "configChSel": {
+                      "type": "boolean",
+                      "description": "前端中文选择标记"
+                    },
+                    "userDefinedChSel": {
+                      "type": "boolean",
+                      "description": "前端中文选择标记"
+                    },
+                    "isGenHelp": {
+                      "x-nullable": true
+                    },
+                    "isInputInvalidValue": {
+                      "x-nullable": true
+                    },
+                    "invalidValueIsNull": {
+                      "x-nullable": true
+                    },
+                    "isSptMultiLang": {
+                      "x-nullable": true
+                    },
+                    "isUserGroup": {
+                      "x-nullable": true
+                    },
+                    "mmlDataTypeName": {
+                      "x-nullable": true
+                    },
+                    "mocName": {
+                      "x-nullable": true
+                    },
+                    "paraCnName": {
+                      "x-nullable": true
+                    },
+                    "isMandatory": {
+                      "x-nullable": true
+                    },
+                    "isKey": {
+                      "x-nullable": true
+                    },
+                    "isIndexField": {
+                      "x-nullable": true
+                    },
+                    "cpxcfgMappingCfg": {
+                      "x-nullable": true
+                    },
+                    "sourceOptions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "description": "",
+                        "properties": {
+                          "value": {
+                            "type": "string",
+                            "description": "选项值"
+                          },
+                          "label": {
+                            "type": "string",
+                            "description": "显示名称"
+                          }
+                        }
+                      },
+                      "description": ""
+                    },
+                    "unitOptions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "description": "",
+                        "properties": {
+                          "value": {
+                            "type": "string",
+                            "description": "选项值"
+                          },
+                          "label": {
+                            "type": "string",
+                            "description": "显示名称"
+                          }
+                        }
+                      },
+                      "description": ""
+                    },
+                    "udgUnitOptions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "description": "",
+                        "properties": {
+                          "value": {
+                            "type": "string",
+                            "description": "选项值"
+                          },
+                          "label": {
+                            "type": "string",
+                            "description": "显示名称"
+                          }
+                        }
+                      },
+                      "description": ""
+                    },
+                    "isGenHelpOptions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "description": "",
+                        "properties": {
+                          "value": {
+                            "type": "integer",
+                            "description": "选项值"
+                          },
+                          "label": {
+                            "type": "string",
+                            "description": "显示名称"
+                          }
+                        }
+                      },
+                      "description": ""
+                    }
+                  }
+                }
+              },
+              "required": [
+                "taskId",
+                "mmlParaTable"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "boolean",
+                  "description": "是否成功；false 表示业务失败"
+                },
+                "data": {
+                  "type": "object",
+                  "x-nullable": true,
+                  "description": "成功样本为 null，无返回数据"
+                },
+                "message": {
+                  "type": "string",
+                  "description": "结果提示，成功时可为空字符串"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/commandPara/list": {
       "post": {
         "summary": "查询命令参数列表",
